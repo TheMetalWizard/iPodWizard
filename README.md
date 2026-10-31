@@ -1,5 +1,5 @@
 # iPodWizard
-The iPod firmware editor. iPodWizard is a utility for modifying clickwheel iPods and backing up firmwares.
+Originally created in 2004, iPW is an iPod firmware modification utility which allows you to customize the Stock OS of Clickwheel based iPods. From themes which modify the graphics to low level modifications of the firmware itself, it has long been an essential tool in the iPod modding scene.
 
 ## How to run iPodWizard
 1. Download the program from the releases tab
