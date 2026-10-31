@@ -40,7 +40,7 @@ If you modify the source, run both scripts in order to link the modified files t
 You may need to delete the ./Release folder if linking fails.
 
 #### Common problems:
-1. If building the CLI, "Microsoft Visual Studio 2005 was not found"
+1. If building from the CLI, "Microsoft Visual Studio 2005 was not found"
 - Run the scripts from a VS2005 Command Prompt
 - Your VS2005 install may be in the wrong directory
 2. When building, "LNK1104: cannot open file "Release\iPodWizard.exe"
