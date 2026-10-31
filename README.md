@@ -50,8 +50,11 @@ You may need to delete the ./Release folder if linking fails.
 
 #### Optimisation & Configuration:
 Release: /O2 /Ob2 /Oi /Ot /Oy /GF
+
 Whole program: /GL with /LTCG at the link
+
 Static MFC: /MT
+
 Unicode, x86 (32-bit)
 
 The scripts build at the highest speed settings above. Reducing the speed will reduce the size of the program. There is no detectable change in performance of the program.
