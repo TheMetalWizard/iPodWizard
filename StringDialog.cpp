@@ -1214,17 +1214,30 @@ void CStringDialog::OnCbnSelchangeLangidxCombo()
 
 LPCTSTR CStringDialog::GetString(DWORD lang, DWORD index)
 {
-	wchar_t *sOut;
-	CString s;
-	if (m_bShowAll)
+	wchar_t *sOut = NULL;
+	const char *p = (const char *)(m_bShowAll ? m_pFirmware->GetString(index)
+	                                          : m_pFirmware->GetLangString(lang, index));
+	const BYTE *base = m_pFirmware->GetFirmwareBuffer();
+	const BYTE *end = base + m_pFirmware->GetFirmwareSize();
+	// copy the NUL-terminated string out of the firmware, never reading past its end
+	size_t n = 0;
+	if (p != NULL && (const BYTE *)p >= base && (const BYTE *)p < end)
 	{
-		s.Format(TEXT("%s"), m_pFirmware->GetString(index));
+		while ((const BYTE *)(p + n) < end && p[n] != 0)
+			n++;
 	}
 	else
 	{
-		s.Format(TEXT("%s"), m_pFirmware->GetLangString(lang, index));
+		p = "(null)";
+		n = 6;
 	}
-	Utf8Decode((char *)s.GetBuffer(), &sOut);
+	char *tmp = (char *)malloc(n + 1);
+	if (tmp == NULL)
+		return TEXT("");
+	memcpy(tmp, p, n);
+	tmp[n] = 0;
+	Utf8Decode(tmp, &sOut);
+	free(tmp);
 	return (LPTSTR)sOut;
 }
 

@@ -192,7 +192,10 @@ static void Utf8Decode( char* str, wchar_t** ucs2 )
 		return;
 	}
 
-	wchar_t* tempBuf = ( wchar_t* )alloca(( len+1 )*sizeof( wchar_t ));
+	// heap, not alloca: a long printable run in a firmware can be hundreds of KB
+	wchar_t* tempBuf = ( wchar_t* )malloc(( len+1 )*sizeof( wchar_t ));
+	if ( tempBuf == NULL )
+		return;
 	{
 		wchar_t* d = tempBuf;
 		BYTE* s = ( BYTE* )str;
@@ -229,6 +232,7 @@ static void Utf8Decode( char* str, wchar_t** ucs2 )
 	}
 
    WideCharToMultiByte( CP_ACP, 0, tempBuf, -1, str, len, NULL, NULL );
+	free( tempBuf );
 }
 
 static bool GetUserColor(unsigned int base_color, unsigned int *ret_color, HWND hWnd)
