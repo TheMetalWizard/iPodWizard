@@ -1,0 +1,41 @@
+1: Before modifying your iPod, save a backup firmware file to your computer with iPodWizard's Firmware Extractor, just in case you need to start fresh again.
+2: Before you begin!
+3: Starting/Troubleshooting
+
+1: This can be done by changing strings. Under the strings tab in 'Firmware Editor', search for the string 'iPod'.
+2: Change 'iPod' in the title?
+3: Editing
+
+1: Chances are that you've chosen the wrong theme for your iPod firmware.
+2: Images messed up?
+3: Editing
+
+1: iPodWizard can tweak many aspects of your iPod, from showing CPU usage to displaying your battery in volts. Go to the 'Tweaks' menu.
+2: Did you know?
+3: Tweaks
+
+1: iPodWizard can remove the European volume limit from most iPods! Go to the 'Strings' menu.
+2: Did you know?
+3: Tweaks
+
+1: iPodWizard allows you to combine all of your changes - graphics, fonts, and strings - into the one .ipw file. This is perfect for not only storage, but sharing your creative works with other iPodWizard users around the world!
+2: Want to share your theme?
+3: Themes
+
+1: The iPoddities Discord is a friendly iPod archival community which has become the current channel for iPodWizard themes & conversation.
+2: Want a pre-made theme?
+3: Themes
+4: https://discord.com/invite/Hd9fhjzFCU
+
+1: Remember to run iPodWizard as an administrator, otherwise you won't be able to interact with a connected iPod. 
+2: Connection issues?
+3: Troubleshooting
+
+1: All resources on the iPod are linked to form one big puzzle. Check the Layouts tab for editing resources connections.
+2: Did you know?
+3: Resources
+
+1: Many questions about the program can be answered at the iPoddities Discord. Click 'Tell me more' to go there.
+2: Have a question?
+3: Info
+4: https://discord.com/invite/Hd9fhjzFCU
