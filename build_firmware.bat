@@ -9,7 +9,7 @@ if not exist "%VCVARS%" goto novs
 call "%VCVARS%" x86
 cd /d "%~dp0"
 if not exist Release mkdir Release
-cl.exe /c /nologo /W3 /O2 /Ob1 /Oi /Ot /GL /D WIN32 /D NDEBUG /D _WINDOWS /D _UNICODE /D UNICODE /D ZIP_ARCHIVE_MFC /EHsc /MT /GS /Gy /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Release\\" /Fd"Release\vc80.pdb" /Gd /TP /I "." /I "Release" firmware.cpp Font.cpp Picture.cpp OTFFontParser.cpp stdafx.cpp Color.cpp DarkMode.cpp cgfiltyp.cpp DialogMinHelpBtn.cpp FontWnd.cpp HelpDialog.cpp hexeditor.cpp HScrollListBox.cpp HyperLink.cpp MFCSink.cpp OTFFontWnd.cpp PictureWnd.cpp PrefsDialog.cpp RDragDropFiles.cpp ResourceManager.cpp ScanDialog.cpp StringDialog.cpp ThemePreviewer.cpp ThemeWnd.cpp ThemesDialog.cpp TipDlg.cpp ToolTipListCtrl.cpp FontsDialog.cpp OTFDialog.cpp PicturesDialog.cpp LayoutNames.cpp PixoScript.cpp CommandTable.cpp LayoutAttrs.cpp VisualStylesXP.cpp
+cl.exe /c /nologo /W3 /O2 /Ob2 /Oi /Ot /Oy /GF /GL /D WIN32 /D NDEBUG /D _WINDOWS /D _UNICODE /D UNICODE /D ZIP_ARCHIVE_MFC /EHsc /MT /GS /Gy /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Release\\" /Fd"Release\vc80.pdb" /Gd /TP /I "." /I "Release" firmware.cpp Font.cpp Picture.cpp OTFFontParser.cpp stdafx.cpp Color.cpp DarkMode.cpp cgfiltyp.cpp DialogMinHelpBtn.cpp FontWnd.cpp HelpDialog.cpp hexeditor.cpp HScrollListBox.cpp HyperLink.cpp MFCSink.cpp OTFFontWnd.cpp PictureWnd.cpp PrefsDialog.cpp RDragDropFiles.cpp ResourceManager.cpp ScanDialog.cpp StringDialog.cpp ThemePreviewer.cpp ThemeWnd.cpp ThemesDialog.cpp TipDlg.cpp ToolTipListCtrl.cpp FontsDialog.cpp OTFDialog.cpp PicturesDialog.cpp LayoutNames.cpp PixoScript.cpp CommandTable.cpp LayoutAttrs.cpp VisualStylesXP.cpp
 if errorlevel 1 (echo COMPILE FAILED) else (echo COMPILE OK)
 goto :eof
 :novs
