@@ -47,7 +47,7 @@ You may need to delete the ./Release folder if linking fails.
 - './Release/iPodWizard.exe' is currently running. Close it, or if it's frozen, close from task manager.
 3. Various missing .obj or unresolved external symbol errors
 - Scripts ran in the wrong order. Ensure './build_firmware.bat' is ran before './build.bat'
-- 
+
 #### Optimisation & Configuration:
 Release: /O2 /Ob2 /Oi /Ot /Oy /GF
 Whole program: /GL with /LTCG at the link
