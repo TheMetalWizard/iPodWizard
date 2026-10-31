@@ -61,3 +61,6 @@ Releases on this page were built at the highest optimisation settings.
 The ZipArchive library in './zip' is copyright
 2000 - 2006 by Tadeusz Dracz under GNU GPL V2.0
 License can be found in the ZipArchive folder.
+
+#### A.I. Disclosure
+The program and the command table was made with assistive tools from Claude Code and local LLM’s. I understand the moral, ethical & personal critics of A.I. tools, and as an artist and designer, the negative impact of A.I. has been felt in my own studies. I don’t believe that this program would ever have been updated without this assistance, and with the only recompilation attempts I was a part of stagnating, I have been trying to find help in recompiling and fixing this program. I have personally bug tested and gathered feedback with a group of 8 both new & experienced users. All project management & design roles have been done by myself with input from real people, which A.I. had no part of. I have over 30 pages in my sketchbook just for UI design, which I then built by hand in VS Studio 2005 and flow charts used to help make the iPW experience as streamlined as possible, something A.I. simply could not do.
