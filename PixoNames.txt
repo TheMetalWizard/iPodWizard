@@ -1,7 +1,5 @@
-# iPodWizard: names of the functions, objects and methods in the command table (the compiled user interface script).
-# They are carried over from the one firmware that has them, the development build of the nano (14.5.2), by lining the
-# code up. They are inferred, not authoritative. One section per firmware (CRC-32 of the IDs and code lengths of its functions),
-# then one line per atom: number, TAB, name.
+# iPodWizard: names of the functions, objects and methods in the command table.
+# They are inferred from a collection of 38 firmwares and may not be 100% accurate.
 [9869645B]
 # 11_2g_Firmware-1.1.0.2.bin.zip
 6	undefined
