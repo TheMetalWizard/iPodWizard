@@ -2,6 +2,8 @@
 #include "afxcmn.h"
 #include "Firmware.h"
 
+class CLayoutDialog;
+
 // CTweaksDialog dialog
 
 class CTweaksDialog : public CDarkDialog
@@ -24,6 +26,10 @@ public:
 	afx_msg void OnBnClickedApply();
 	void Refresh();
 	void SetFirmware(CFirmware *pFirmware) { m_pFirmware = pFirmware; }
+	void SetLayoutDialog(CLayoutDialog *pLayout) { m_pLayout = pLayout; }   // "Change Selector Bar Color" works on the layouts of the firmware: the routine is the layout dialog's
+	afx_msg void OnBnClickedSelectorBar();
+	afx_msg void OnBnClickedClickPitch();
+	afx_msg void OnBnClickedLcdInvert();
 	afx_msg void OnBnClickedFlipReflash();
 	afx_msg void OnBnClickedVolumeHackButton();
 	virtual BOOL PreTranslateMessage(MSG *pMsg);
@@ -32,6 +38,7 @@ public:
 
 private:
 	CFirmware *m_pFirmware;
+	CLayoutDialog *m_pLayout;
 	CToolTipCtrl m_Tip;
 	CString m_lastDrive;                 // what the boxes show: the iPod folder and which tweak files it had at the last look
 	BOOL m_lastOK;

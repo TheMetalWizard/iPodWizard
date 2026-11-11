@@ -231,6 +231,7 @@ void CiPodWizardApp::InitHDDValues(int fd)
 	if (_read(fd, mbr, 16384) <= 0)
 		return;
 	unsigned char macsig[2]={'E', 'R'};
+	FIRMWARE_LEN = 0;
 
 	if (memcmp(mbr, macsig, 2))
 	{
@@ -243,6 +244,28 @@ void CiPodWizardApp::InitHDDValues(int fd)
 	else
 	{
 		FIRMWARE_START=63*BLOCK_SIZE;
+		// The Apple partition map says where the firmware partition (Apple_MDFW) is: block 63 on the later iPods, block 4 on the 1st and 2nd
+		// generation (a 32 MB partition). Guessing 63 there started the write 126976 bytes behind the partition and ran it into the data partition.
+		int mapBlock = (mbr[2] << 8) | mbr[3];
+		if (mapBlock < 512 || mapBlock > 4096)
+			mapBlock = 512;
+		for (int e = 1; e <= 30 && (e + 1) * mapBlock <= (int)sizeof(mbr); e++)
+		{
+			const unsigned char *pm = &mbr[e * mapBlock];
+			if (pm[0] != 'P' || pm[1] != 'M')
+				break;
+			if (strncmp((const char *)&pm[48], "Apple_MDFW", 10) == 0)
+			{
+				DWORD start = (pm[8] << 24) | (pm[9] << 16) | (pm[10] << 8) | pm[11];
+				DWORD cnt = (pm[12] << 24) | (pm[13] << 16) | (pm[14] << 8) | pm[15];
+				if (start > 0 && cnt > 0)
+				{
+					FIRMWARE_START = (long)((__int64)start * mapBlock);
+					FIRMWARE_LEN = (long)((__int64)cnt * mapBlock);
+				}
+				break;
+			}
+		}
 	}
 
 	_lseek(fd, FIRMWARE_START, SEEK_SET);
@@ -260,7 +283,7 @@ void CiPodWizardApp::InitHDDValues(int fd)
 	char *warn=new char[size+2];
 	memset(warn, 0, size+1);
 	memcpy(warn, buf, size);
-	if (strncmp(warn, strwarn, size))
+	if (strncmp(warn, strwarn, size) && FIRMWARE_LEN == 0)      // (a partition the map names is not guessed at again)
 	{
 		if (BLOCK_SIZE==512)
 			BLOCK_SIZE=2048;
@@ -288,6 +311,7 @@ void CiPodWizardApp::LoadPreferences()
 	m_ForceReflash=(BOOL)theApp.GetProfileIntW(_T("Main"), _T("ForceReflash"), FALSE);
 	m_NoReflash=(BOOL)theApp.GetProfileIntW(_T("Main"), _T("NoReflash"), FALSE);
 	m_OldResourceSaving=(BOOL)theApp.GetProfileIntW(_T("Main"), _T("OldResourceSaving"), FALSE);
+	m_AutoEject=(BOOL)theApp.GetProfileIntW(_T("Main"), _T("AutoEject"), FALSE);
 }
 
 void CiPodWizardApp::CalcPartMapAddr(unsigned char *buf)

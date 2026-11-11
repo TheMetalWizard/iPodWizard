@@ -427,6 +427,20 @@ void CLayoutDialog::CmdBuildLines(int functionId, bool bSource, std::vector<Line
 		lines.push_back(l);
 	}
 
+	// Do the instructions hang together (stack depth, jumps, arguments, variables)? Every command of the 52 firmwares of the collection does, so a
+	// command that fails was changed, or this is a firmware that is not known.
+	{
+		CString why;
+		if (!script.Verify(*pf, &why))
+			lines.push_back(CommentLine(_T("Check failed: ") + why + _T(" The iPod may not run this command correctly.")));
+	}
+
+	// the game this command belongs to: the numbers in the firmware that decide how it plays
+	if (m_Commands.IsBrickCommand(functionId))
+		CmdBrickLines(lines);
+	if (m_Commands.IsStackerCommand(functionId))
+		CmdStackerLines(lines);
+
 	// who runs it: every place, one row each
 	const std::vector<CCommandTable::Use> &uses = m_Commands.GetUses(functionId);
 	if (uses.empty())
@@ -512,6 +526,539 @@ void CLayoutDialog::CmdBuildLines(int functionId, bool bSource, std::vector<Line
 			for (size_t i = 0; i < body.size(); i++)
 				lines.push_back(body[i]);
 	}
+}
+
+// Brick (BlockO): the numbers in the firmware that decide how the game plays, each one a link to its bytes. The rules are written down in
+// Brick-Game-Logic.txt (research folder). The level table has one row per level: the balls, the rows of bricks (12 bricks per row, so the bricks
+// to destroy are 12 x rows) and the width of the paddle.
+void CLayoutDialog::CmdBrickLines(std::vector<Line> &lines)
+{
+	const CCommandTable::BrickInfo &bi = m_Commands.Brick();
+	if (m_pFirmware == NULL || !bi.valid || bi.table == 0xFFFFFFFF)
+		return;
+	const BYTE *fw = m_pFirmware->GetFirmwareBuffer();
+	DWORD size = m_pFirmware->GetFirmwareSize();
+	if ((ULONGLONG)bi.table + 23 * 12 > size)
+		return;
+	lines.push_back(CommentLine(_T("Brick (BlockO) game. This command starts, pauses or asks about the game; the game itself is code of the operating system, not of this script.")));
+	lines.push_back(CommentLine(_T("What decides how it plays (click a number to see its bytes, Change Value changes it; keep a copy of the firmware). Rules: Brick-Game-Logic.txt.")));
+	if (bi.lives != 0xFFFFFFFF && bi.lives < size)
+	{
+		CLineBuilder b;
+		Ref r;
+		r.type = REF_NONE;
+		r.absolute = true;
+		r.off = (int)bi.lives;
+		r.len = 1;
+		r.tip = _T("Lives of a new game: the number in the instruction 'mov r0,#3' (1 to 255). Only 3 balls can be in play, more lives are spare.");
+		CString v;
+		v.Format(_T("%d"), fw[bi.lives]);
+		b.Add(_T("  Lives at the start: "));
+		b.Token(v, r);
+		lines.push_back(b.Make());
+	}
+	if (bi.vx != 0xFFFFFFFF && bi.vx + 8 <= size)
+	{
+		DWORD vx = CCommandTable::MovValue(*(const DWORD *)(fw + bi.vx));
+		DWORD vy = CCommandTable::MovValue(*(const DWORD *)(fw + bi.vy));
+		CLineBuilder b;
+		Ref r;
+		r.type = REF_NONE;
+		r.absolute = true;
+		r.off = (int)bi.vx;
+		r.len = 8;
+		r.tip = _T("Start speed of a ball: the two instructions that load 0x28000 (across) and 0x21000 (down), 16.16 fixed point. Change Value takes a percent of the original speed (100 = original, 200 = twice as fast).");
+		CString pct, rest;
+		pct.Format(_T("%d%%"), (int)((vx * 100.0) / 0x28000 + 0.5));
+		rest.Format(_T(" of the original (a new ball moves %.2f pixels across and %.2f down every 40 ms; 100%% = 2.50 and 2.06)"), vx / 65536.0, vy / 65536.0);
+		b.Add(_T("  Ball speed: "));
+		b.Token(pct, r);
+		b.Add(rest);
+		lines.push_back(b.Make());
+	}
+	// the other numbers of the game (each found in the code of the game, see Brick-Game-Logic.txt)
+	if (bi.score != 0xFFFFFFFF && bi.score < size)
+	{
+		CLineBuilder b;
+		Ref r;
+		r.type = REF_NONE;
+		r.absolute = true;
+		r.off = (int)bi.score;
+		r.len = 1;
+		r.tip = _T("Points for every brick destroyed: the number in the instruction 'add r1,r0,#1' (1 to 255).");
+		CString v;
+		v.Format(_T("%d"), fw[bi.score]);
+		b.Add(_T("  Points for each brick: "));
+		b.Token(v, r);
+		lines.push_back(b.Make());
+	}
+	if (bi.bonus != 0xFFFFFFFF && bi.bonus + 4 <= size)
+	{
+		DWORD w = *(const DWORD *)(fw + bi.bonus);
+		CLineBuilder b;
+		Ref r;
+		r.type = REF_NONE;
+		r.absolute = true;
+		r.off = (int)bi.bonus;
+		r.len = 4;
+		r.tip = _T("Lives given when every brick of a level is gone. Stock: one for every ball still in play (the instruction 'add r0,r0,r1'). Change Value: 1 = that (the original), 0 or 2 to 255 = that many lives whatever the number of balls.");
+		CString v = (w & 0xFFFFF000) == 0xE2800000 ? CString() : CString(_T("one for each ball still in play"));
+		if (v.IsEmpty())
+			v.Format(_T("%d"), (int)(w & 0xFFF));
+		b.Add(_T("  Lives gained when a level is cleared: "));
+		b.Token(v, r);
+		lines.push_back(b.Make());
+	}
+	if (bi.ballW != 0xFFFFFFFF && bi.ballH != 0xFFFFFFFF && bi.ballW < size && bi.ballH < size)
+	{
+		CLineBuilder b;
+		Ref r;
+		r.type = REF_NONE;
+		r.absolute = true;
+		r.len = 1;
+		CString v;
+		r.off = (int)bi.ballW;
+		r.tip = _T("Width of a ball in pixels (the instruction that sets the right edge of its rectangle, 1 to 20). The rectangle is also what hits bricks, the paddle and the walls.");
+		v.Format(_T("%d"), fw[bi.ballW]);
+		b.Add(_T("  Ball size: "));
+		b.Token(v, r);
+		b.Add(_T(" wide, "));
+		r.off = (int)bi.ballH;
+		r.tip = _T("Height of a ball in pixels (the number added to its top to get the bottom edge, 1 to 20).");
+		v.Format(_T("%d"), fw[bi.ballH]);
+		b.Token(v, r);
+		b.Add(_T(" high (pixels)"));
+		lines.push_back(b.Make());
+	}
+	if (bi.ballGap != 0xFFFFFFFF && bi.ballGap < size)
+	{
+		CLineBuilder b;
+		Ref r;
+		r.type = REF_NONE;
+		r.absolute = true;
+		r.off = (int)bi.ballGap;
+		r.len = 1;
+		r.tip = _T("How far below the last row of bricks a new ball starts, in pixels (0 to 60).");
+		CString v;
+		v.Format(_T("%d"), fw[bi.ballGap]);
+		b.Add(_T("  A new ball starts "));
+		b.Token(v, r);
+		b.Add(_T(" pixels below the bricks"));
+		lines.push_back(b.Make());
+	}
+	lines.push_back(CommentLine(_T("  Fixed by the game's code (not a single number): 3 balls at most, 6 rows of 12 bricks, bricks 4 pixels high, a 40 ms step, the paddle moves 4 pixels for every")));
+	lines.push_back(CommentLine(_T("  click of the wheel (10 for the buttons), and a ball that hits an outer third of the paddle is sped up x1.5 or slowed x0.75 sideways.")));
+	lines.push_back(CommentLine(_T("  The levels (the game goes on to the next one when every brick is gone, and repeats the last one):")));
+	for (int lvl = 0; lvl < 22; lvl++)
+	{
+		DWORD at = bi.table + 12 * lvl;
+		const DWORD *w = (const DWORD *)(fw + at);
+		if (w[0] == 0)
+			break;
+		CLineBuilder b;
+		CString t;
+		Ref r;
+		r.type = REF_NONE;
+		r.absolute = true;
+		r.len = 4;
+		t.Format(_T("    Level %d: "), lvl + 1);
+		b.Add(t);
+		r.off = (int)at;
+		r.tip = _T("Balls in play at the start of this level (1 to 3).");
+		t.Format(_T("%u"), w[0]);
+		b.Token(t, r);
+		b.Add(w[0] == 1 ? _T(" ball, ") : _T(" balls, "));
+		r.off = (int)at + 4;
+		r.tip = _T("Rows of bricks (1 to 6). Each row has 12 bricks, so the bricks to destroy in this level are 12 x this number.");
+		t.Format(_T("%u"), w[1]);
+		b.Token(t, r);
+		t.Format(w[1] == 1 ? _T(" row = %u bricks to destroy, paddle ") : _T(" rows = %u bricks to destroy, paddle "), w[1] * 12);
+		b.Add(t);
+		r.off = (int)at + 8;
+		r.tip = _T("Width of the paddle in pixels in this level (1 to 160; the field is 160 pixels wide on a 4G).");
+		t.Format(_T("%u"), w[2]);
+		b.Token(t, r);
+		b.Add(_T(" pixels"));
+		lines.push_back(b.Make());
+	}
+	lines.push_back(Line());
+}
+
+// The 12 bit field of "mov rX,#imm" for a value (8 bits rotated right by an even number of bits), or -1 when the value does not fit
+static int MovField(DWORD value)
+{
+	if (value == 0)
+		return -1;
+	for (DWORD rot = 0; rot < 16; rot++)
+	{
+		DWORD r = 2 * rot;
+		DWORD imm = r ? ((value << r) | (value >> (32 - r))) : value;
+		if (imm < 256)
+			return (int)((rot << 8) | imm);
+	}
+	return -1;
+}
+
+// Stacker (the falling block game of the 3G prototype): the numbers that decide how it plays, each one a link to its bytes. The rules are written down
+// in Stacker-Game-Logic.txt (research folder). A piece falls every 12 ticks, the tick is 40 ms; the shapes are 16 entries (4 kinds x 4 rotations).
+void CLayoutDialog::CmdStackerLines(std::vector<Line> &lines)
+{
+	const CCommandTable::StackerInfo &si = m_Commands.Stacker();
+	if (m_pFirmware == NULL || !si.valid)
+		return;
+	const BYTE *fw = m_pFirmware->GetFirmwareBuffer();
+	DWORD size = m_pFirmware->GetFirmwareSize();
+	if ((ULONGLONG)si.table + 16 * 32 > size || si.firstPiece >= size || si.tick[2] >= size || si.points >= size || si.column[1] >= size)
+		return;
+	lines.push_back(CommentLine(_T("Stacker game (falling blocks, 12 x 16 board). This command starts, pauses or asks about the game; the game itself is code of the operating system, not of this script.")));
+	lines.push_back(CommentLine(_T("What decides how it plays (click a number to see its bytes, Change Value changes it; keep a copy of the firmware). Rules: Stacker-Game-Logic.txt.")));
+	CString v;
+	{
+		CLineBuilder b;
+		Ref r;
+		r.type = REF_NONE;
+		r.absolute = true;
+		r.len = 1;
+		r.off = (int)si.points;
+		r.tip = _T("Points for every full row: the number in the instruction 'add r1,r0,#12' (1 to 255).");
+		v.Format(_T("%d"), fw[si.points]);
+		b.Add(_T("  Points for a full row: "));
+		b.Token(v, r);
+		lines.push_back(b.Make());
+	}
+	{
+		CLineBuilder b;
+		Ref r;
+		r.type = REF_NONE;
+		r.absolute = true;
+		r.len = 1;
+		r.off = (int)si.tick[0];
+		r.tip = _T("Length of a tick in milliseconds: the number in 'mov r1,#40', in three places that Change Value changes together (5 to 255). A piece falls every 12 ticks.");
+		v.Format(_T("%d"), fw[si.tick[0]]);
+		b.Add(_T("  A tick is "));
+		b.Token(v, r);
+		v.Format(_T(" ms: a piece falls one row every %d ms (12 ticks); the fast drop and the wheel are handled on every tick"), 12 * fw[si.tick[0]]);
+		b.Add(v);
+		lines.push_back(b.Make());
+	}
+	{
+		CLineBuilder b;
+		Ref r;
+		r.type = REF_NONE;
+		r.absolute = true;
+		r.len = 1;
+		r.off = (int)si.column[0];
+		r.tip = _T("The column (0 to 11) a new piece appears in: the number in 'mov r0,#6' (and in the one for the first piece; Change Value changes both).");
+		v.Format(_T("%d"), fw[si.column[0]]);
+		b.Add(_T("  A new piece appears in column "));
+		b.Token(v, r);
+		r.off = (int)si.firstPiece;
+		r.tip = _T("The kind of the first piece of a game (0 square, 1 S/Z, 2 T, 3 bar): the shape number in 'mov r1,#4' divided by 4. The later pieces are random.");
+		v.Format(_T("%d"), fw[si.firstPiece] / 4);
+		b.Add(_T(", the first piece is kind "));
+		b.Token(v, r);
+		b.Add(_T(" (0 to 3)"));
+		lines.push_back(b.Make());
+	}
+	lines.push_back(CommentLine(_T("  The pieces: columns x rows, the origin (the cell that sits on the piece's position) and the 4 x 4 cells (the number is the block picture, . is empty):")));
+	for (int e = 0; e < 16; e++)
+	{
+		DWORD at = si.table + 32 * e;
+		const DWORD *w = (const DWORD *)(fw + at);
+		CLineBuilder b;
+		Ref r;
+		r.type = REF_NONE;
+		r.absolute = true;
+		r.len = 4;
+		CString t;
+		t.Format(_T("    Kind %d, turn %d: "), e / 4, e % 4);
+		b.Add(t);
+		static const TCHAR *const tip[4] = { _T("Columns the shape is wide (1 to 4)."), _T("Rows the shape is high (1 to 4)."),
+		                                     _T("Column of the shape that sits on the piece's position (0 to 3)."), _T("Row of the shape that sits on the piece's position (0 to 3).") };
+		static const TCHAR *const sep[4] = { _T(" x "), _T(", origin "), _T(","), _T("   cells ") };
+		for (int k = 0; k < 4; k++)
+		{
+			r.off = (int)at + 4 * k;
+			r.len = 4;
+			r.tip = tip[k];
+			t.Format(_T("%u"), w[k]);
+			b.Token(t, r);
+			b.Add(sep[k]);
+		}
+		CString cells;
+		for (int row = 0; row < 4; row++)
+		{
+			if (row)
+				cells += _T(" ");
+			for (int col = 0; col < 4; col++)
+			{
+				BYTE c = fw[at + 16 + 4 * row + col];
+				cells += c == 0 ? _T('.') : (c < 10 ? (TCHAR)(_T('0') + c) : _T('#'));
+			}
+		}
+		r.off = (int)at + 16;
+		r.len = 16;
+		r.tip = _T("The 4 x 4 cells of the shape, row by row, one byte each: 0 empty, 1 to 4 the block picture. Change Value with Hex: type the 16 bytes.");
+		b.Token(cells, r);
+		lines.push_back(b.Make());
+	}
+	lines.push_back(CommentLine(_T("  Fixed by the game's code (not a single number): the 12 x 16 board, 6 pixel cells, 4 kinds of piece chosen at random, the wheel moves a piece one cell, Select turns it.")));
+	lines.push_back(Line());
+}
+
+// How many bytes the marked bytes of a number of the games take
+static DWORD BrickKindSize(int kind)
+{
+	switch (kind)
+	{
+	case 2: return 8;
+	case 3: case 4: case 5: case 7: case 15: return 4;
+	case 16: return 16;
+	}
+	return 1;
+}
+
+// What the marked bytes are, when they are one of the numbers of Brick or Stacker (see CmdBrickLines, CmdStackerLines): 0 none, 1 lives, 2 speed (percent, both
+// instructions), 3 balls, 4 rows, 5 paddle width (the level table), 6 points per brick, 7 lives for a cleared level, 8 / 9 width / height of the ball, 10 where a
+// ball starts below the bricks; Stacker: 11 points per row, 12 tick length (three places), 13 start column (two places), 14 kind of the first piece, 15 a number of a
+// shape, 16 the cells of a shape
+int CLayoutDialog::BrickKind(DWORD off, DWORD size) const
+{
+	const CCommandTable::StackerInfo &si = m_Commands.Stacker();
+	if (si.valid)
+	{
+		if (off == si.points && size == 1)
+			return 11;
+		if (off == si.tick[0] && size == 1)
+			return 12;
+		if (off == si.column[0] && size == 1)
+			return 13;
+		if (off == si.firstPiece && size == 1)
+			return 14;
+		if (off >= si.table && off < si.table + 16 * 32)
+		{
+			DWORD in = (off - si.table) % 32;
+			if (in < 16 && in % 4 == 0 && size == 4)
+				return 15;
+			if (in == 16 && size == 16)
+				return 16;
+		}
+	}
+	const CCommandTable::BrickInfo &bi = m_Commands.Brick();
+	if (!bi.valid || bi.table == 0xFFFFFFFF)
+		return 0;
+	if (bi.lives != 0xFFFFFFFF && off == bi.lives && size == 1)
+		return 1;
+	if (bi.vx != 0xFFFFFFFF && off == bi.vx && size == 8)
+		return 2;
+	if (off >= bi.table && off < bi.table + 22 * 12 && size == 4 && (off - bi.table) % 4 == 0)
+		return 3 + (int)(((off - bi.table) / 4) % 3);
+	if (bi.score != 0xFFFFFFFF && off == bi.score && size == 1)
+		return 6;
+	if (bi.bonus != 0xFFFFFFFF && off == bi.bonus && size == 4)
+		return 7;
+	if (bi.ballW != 0xFFFFFFFF && off == bi.ballW && size == 1)
+		return 8;
+	if (bi.ballH != 0xFFFFFFFF && off == bi.ballH && size == 1)
+		return 9;
+	if (bi.ballGap != 0xFFFFFFFF && off == bi.ballGap && size == 1)
+		return 10;
+	return 0;
+}
+
+// The current value of one of them as Change Value takes it (decimal)
+CString CLayoutDialog::BrickValueText(int kind, DWORD off)
+{
+	CString s;
+	if (m_pFirmware == NULL || (ULONGLONG)off + BrickKindSize(kind) > m_pFirmware->GetFirmwareSize())
+		return s;
+	const BYTE *fw = m_pFirmware->GetFirmwareBuffer();
+	switch (kind)
+	{
+	case 1: case 6: case 8: case 9: case 10: case 11: case 12: case 13:
+		s.Format(_T("%d"), fw[off]);
+		break;
+	case 14:
+		s.Format(_T("%d"), fw[off] / 4);
+		break;
+	case 2:
+		s.Format(_T("%d"), (int)((CCommandTable::MovValue(*(const DWORD *)(fw + off)) * 100.0) / 0x28000 + 0.5));
+		break;
+	case 7:
+		{
+			DWORD w = *(const DWORD *)(fw + off);
+			s.Format(_T("%d"), (w & 0xFFFFF000) == 0xE2800000 ? (int)(w & 0xFFF) : 1);          // 1: one for every ball still in play (the original)
+		}
+		break;
+	case 16:
+		break;                                                                                  // cells: Hex only
+	default:
+		s.Format(_T("%u"), *(const DWORD *)(fw + off));
+		break;
+	}
+	return s;
+}
+
+// "Change Value" on one of the numbers of Brick or Stacker. Handled here when the marked bytes are one of them. Hex: the bytes themselves; Decimal: the value.
+bool CLayoutDialog::BrickChange()
+{
+	if (!m_bLinkClick || m_pFirmware == NULL)
+		return false;
+	DWORD off = m_ValOffset;
+	int kind = BrickKind(off, m_ValSize);
+	if (kind == 0)
+		return false;
+	if (IsDlgButtonChecked(IDC_RADIO_STRINGVAL) == 1)
+	{
+		MessageBox(_T("Type the number as Decimal or Hex."));
+		return true;
+	}
+	const CCommandTable::StackerInfo &si = m_Commands.Stacker();
+	if (IsDlgButtonChecked(IDC_RADIO_HEXVAL) == 1)
+	{
+		// Hex: the bytes themselves ("05 00 80 E2"), as many as are typed (not more than are selected); the rest stay as they are
+		CString hexText = m_ChangeString;
+		hexText.Remove(' ');
+		int lenm = hexText.GetLength();
+		if (lenm == 0 || (lenm % 2) != 0)
+		{
+			MessageBox(_T("Type the bytes as pairs of hex digits, for example 05 00 80 E2."));
+			return true;
+		}
+		for (int j = 0; j < lenm; j++)
+			if (!_istxdigit(hexText[j]))
+			{
+				MessageBox(_T("That is not a hex value."));
+				return true;
+			}
+		if ((DWORD)(lenm / 2) > m_ValSize)
+		{
+			MessageBox(_T("The value you typed is too long!"));
+			return true;
+		}
+		BYTE raw[16];
+		for (int k = 0, j = 0; j < lenm; j += 2, k++)
+		{
+			unsigned int bv = 0;
+			swscanf(hexText.Mid(j, 2), _T("%X"), &bv);
+			raw[k] = (BYTE)bv;
+		}
+		m_pFirmware->SetData(off, raw, lenm / 2);
+		if (kind == 12)                                            // the other places of the same number
+		{
+			m_pFirmware->SetData(si.tick[1], raw, 1);
+			m_pFirmware->SetData(si.tick[2], raw, 1);
+		}
+		else if (kind == 13)
+			m_pFirmware->SetData(si.column[1], raw, 1);
+		BrickChanged(off);
+		return true;
+	}
+	if (kind == 16)
+	{
+		MessageBox(_T("The cells of a shape are 16 bytes: choose Hex and type them (for example 01 01 00 00 01 01 00 00 00 00 00 00 00 00 00 00)."));
+		return true;
+	}
+	long value = 0;
+	if (_stscanf(m_ChangeString, _T("%ld"), &value) != 1)
+	{
+		MessageBox(_T("That is not a number."));
+		return true;
+	}
+	static const long lo[17] = { 0, 1, 10, 1, 1, 1, 1, 0, 1, 1, 0, 1, 5, 0, 0, 0, 0 }, hi[17] = { 0, 255, 400, 3, 6, 160, 255, 255, 20, 20, 60, 255, 255, 11, 3, 4, 0 };
+	static const TCHAR *const what[17] = { _T(""), _T("The lives have to be between 1 and 255."), _T("The speed has to be between 10 and 400 percent of the original."),
+		_T("A level has 1 to 3 balls."), _T("A level has 1 to 6 rows of bricks."), _T("The paddle has to be between 1 and 160 pixels wide."),
+		_T("The points for a brick have to be between 1 and 255."), _T("Type 1 for one life per ball still in play (the original), or 0 or 2 to 255 for that many lives in all."),
+		_T("The ball has to be between 1 and 20 pixels wide."), _T("The ball has to be between 1 and 20 pixels high."),
+		_T("A ball starts 0 to 60 pixels below the bricks."), _T("The points for a row have to be between 1 and 255."),
+		_T("A tick has to be between 5 and 255 milliseconds."), _T("A piece appears in a column from 0 to 11."),
+		_T("The first piece is a kind from 0 to 3 (square, S/Z, T, bar)."), _T("A shape number has to be between 0 and 4."), _T("") };
+	if (value < lo[kind] || value > hi[kind])
+	{
+		MessageBox(what[kind]);
+		return true;
+	}
+	LPBYTE fw = m_pFirmware->GetFirmwareBuffer();
+	if (kind == 2)
+	{
+		// the speed is stored as an immediate of two instructions: only some values fit
+		int fx = MovField((DWORD)(0x28000 * (double)value / 100.0)), fy = MovField((DWORD)(0x21000 * (double)value / 100.0));
+		if (fx < 0 || fy < 0)
+		{
+			CString near_;
+			int n = 0;
+			for (int pct = 10; pct <= 400 && n < 8; pct++)
+				if (abs(pct - (int)value) <= 25 && MovField((DWORD)(0x28000 * (double)pct / 100.0)) >= 0 && MovField((DWORD)(0x21000 * (double)pct / 100.0)) >= 0)
+				{
+					CString p;
+					p.Format(n ? _T(", %d") : _T("%d"), pct);
+					near_ += p;
+					n++;
+				}
+			CString msg;
+			msg.Format(_T("The speed %ld%% cannot be stored exactly: the game keeps it as an 8 bit number shifted by an even amount, so only some values fit."), value);
+			if (!near_.IsEmpty())
+				msg += _T("\n\nSpeeds near it that fit (percent): ") + near_;
+			MessageBox(msg, _T("Value Changer"));
+			return true;
+		}
+		DWORD w0 = (*(DWORD *)(fw + off) & 0xFFFFF000) | (DWORD)fx;
+		DWORD w1 = (*(DWORD *)(fw + off + 4) & 0xFFFFF000) | (DWORD)fy;
+		m_pFirmware->SetData(off, (LPBYTE)&w0, 4);
+		m_pFirmware->SetData(off + 4, (LPBYTE)&w1, 4);
+	}
+	else if (kind == 12)
+	{
+		BYTE b = (BYTE)value;
+		for (int k = 0; k < 3; k++)
+			m_pFirmware->SetData(si.tick[k], &b, 1);
+	}
+	else if (kind == 13)
+	{
+		BYTE b = (BYTE)value;
+		m_pFirmware->SetData(si.column[0], &b, 1);
+		m_pFirmware->SetData(si.column[1], &b, 1);
+	}
+	else if (kind == 14)
+	{
+		BYTE b = (BYTE)(value * 4);                               // the shape number of the first piece: kind x 4
+		m_pFirmware->SetData(off, &b, 1);
+	}
+	else if (kind == 1 || kind == 6 || kind == 11 || (kind >= 8 && kind <= 10))
+	{
+		BYTE b = (BYTE)value;                                     // the 8 bit number of "mov rX,#n" / "add rX,rY,#n"
+		m_pFirmware->SetData(off, &b, 1);
+	}
+	else if (kind == 7)
+	{
+		DWORD w = value == 1 ? 0xE0800001 : (0xE2800000 | (DWORD)value);       // add r0,r0,r1 (a life per ball in play) / add r0,r0,#n
+		m_pFirmware->SetData(off, (LPBYTE)&w, 4);
+	}
+	else
+	{
+		DWORD v = (DWORD)value;
+		m_pFirmware->SetData(off, (LPBYTE)&v, 4);
+	}
+	BrickChanged(off);
+	return true;
+}
+
+// After a change: show the bytes, make the listing again and select the row that was selected
+void CLayoutDialog::BrickChanged(DWORD off)
+{
+	m_HexWnd.SetOffset(off);
+	m_HexWnd.Invalidate();
+	int row = -1;
+	POSITION pos = m_ResourceList.GetFirstSelectedItemPosition();
+	if (pos)
+		row = m_ResourceList.GetNextSelectedItem(pos);
+	CmdFillList(m_CmdFunction);
+	if (row >= 0 && row < m_ResourceList.GetItemCount())
+	{
+		m_ResourceList.SetItemState(row, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
+		m_ResourceList.EnsureVisible(row, FALSE);
+	}
+	MessageBox(_T("Value changed successfully."), _T("Value Changer"), MB_OK);
 }
 
 // One listing line as plain text
@@ -723,18 +1270,22 @@ void CLayoutDialog::CmdFillList(int functionId)
 		if (!l.refs.empty())
 		{
 			CString tip;
+			bool bOpens = false;           // a native method has nothing to open
 			for (size_t r = 0; r < l.refs.size(); r++)
 			{
 				CString t = CmdRefTip(l.refs[r]);
 				if (t.IsEmpty())
 					continue;
+				if (l.refs[r].type != REF_NATIVE)
+					bOpens = true;
 				if (!tip.IsEmpty())
 					tip += _T("\n");
 				tip += t;
 			}
 			if (!tip.IsEmpty())
 			{
-				tip += _T("\nDouble click: open.");
+				if (bOpens)
+					tip += _T("\nDouble click: open.");
 				m_ResourceList.SetItemToolTipText(row, tcol, tip);
 			}
 		}
@@ -753,6 +1304,42 @@ void CLayoutDialog::CmdFillList(int functionId)
 void CLayoutDialog::OnNMRClickResourceList(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	*pResult = 0;
+
+	// a command cell of a menu entry: choose another command
+	if (m_ResourceType == 1 && m_pFirmware != NULL && m_Commands.IsValid())
+	{
+		LPNMITEMACTIVATE pia = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
+		LVHITTESTINFO hit;
+		memset(&hit, 0, sizeof(hit));
+		hit.pt = pia->ptAction;
+		m_ResourceList.SubItemHitTest(&hit);
+		if (hit.iItem >= 0 && hit.iSubItem >= 2 && hit.iSubItem <= 5)
+		{
+			m_ResourceList.SetItemState(hit.iItem, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
+			pia->iItem = hit.iItem;
+			pia->iSubItem = hit.iSubItem;
+			LRESULT r = 0;
+			OnLvnItemClickedResourceList(pNMHDR, &r);          // the cell is selected as if it had been clicked
+			int logical = MenuLogicalCol(hit.iSubItem);
+			CPoint pt;
+			GetCursorPos(&pt);
+			CMenu menu;
+			menu.CreatePopupMenu();
+			menu.AppendMenu(MF_STRING, 1, _T("Choose another command..."));
+			menu.AppendMenu(MF_STRING, 2, _T("Open this command"));
+			int cmd = menu.TrackPopupMenu(TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, this);
+			if (cmd == 1)
+				MenuPickCommand(hit.iItem, logical);
+			else if (cmd == 2 && m_ValSize == 4)
+			{
+				int fn = CCommandTable::RefToFunction(*(const DWORD *)(m_pFirmware->GetFirmwareBuffer() + m_ValOffset));
+				if (fn >= 0 && m_Commands.FindFunction(fn) != NULL)
+					SelectResource(3, fn);
+			}
+			return;
+		}
+	}
+
 	if (!IsCommandMode() || m_CmdFunction == 0)
 		return;
 	CPoint pt;
@@ -852,6 +1439,9 @@ CString CLayoutDialog::CmdRefTip(const Ref &ref)
 		break;
 	case REF_MENU:
 		s.Format(_T("Menu %d: %s"), ref.value, (LPCTSTR)m_Names.Menu(ref.value));
+		break;
+	case REF_NATIVE:
+		s = m_Commands.NativeText(ref.value);
 		break;
 	case REF_CONSTANT:
 		{
@@ -1100,6 +1690,18 @@ CString CLayoutDialog::ChangeCueText()
 			bNumber = true;
 		}
 	}
+	else if (IsCommandMode() && m_bLinkClick)
+	{
+		// one of the numbers of Brick: its value (the same as the Brick lines show), as Decimal or Hex
+		int kind = BrickKind(m_ValOffset, m_ValSize);
+		if (kind != 0)
+		{
+			if (bHex)
+				return m_ValSize <= 16 ? HexBytes(fw + m_ValOffset, (int)m_ValSize) : CString();     // the selected bytes, as the hex view shows them
+			number = _ttol(BrickValueText(kind, m_ValOffset));
+			bNumber = true;
+		}
+	}
 	if (bNumber)
 	{
 		if (bString)
@@ -1146,6 +1748,8 @@ void CLayoutDialog::OnBnClickedValueKind()
 // "Change Value" in the assembly listing: the number the selected instruction carries
 bool CLayoutDialog::CmdChangeValue()
 {
+	if (BrickChange())
+		return true;
 	if (m_ResourceType != 4)
 	{
 		MessageBox(_T("Switch to the assembly listing (Command Table (Assembly)) to change the numbers in the code."));
@@ -1362,13 +1966,312 @@ bool CLayoutDialog::MenuChangeCommand()
 		MessageBox(_T("There is no command with that number. Use a number from the Command Table list."), _T("Value Changer"));
 		return true;
 	}
-	DWORD v = CCommandTable::FunctionToRef((int)fn);
-	m_pFirmware->SetData(m_ValOffset, (LPBYTE)&v, 4);
-	m_HexWnd.SetOffset(m_ValOffset);
+	MenuRelink(m_ClickedCol, m_ValOffset, (int)fn, false);
+	return true;
+}
+
+// Store a new command in a menu entry. Unless the caller has already shown the comparison (the list of commands does), the new command
+// is compared with the one it replaces first and anything odd is shown, with the choice to go on.
+bool CLayoutDialog::MenuRelink(int logicalCol, DWORD offset, int newFn, bool bQuiet)
+{
+	if (m_pFirmware == NULL || (ULONGLONG)offset + 4 > m_pFirmware->GetFirmwareSize() || m_Commands.FindFunction(newFn) == NULL)
+		return false;
+	int oldFn = CCommandTable::RefToFunction(*(const DWORD *)(m_pFirmware->GetFirmwareBuffer() + offset));
+	if (oldFn == newFn)
+	{
+		if (!bQuiet)
+			MessageBox(_T("That entry already runs this command."), _T("Value Changer"));
+		return true;
+	}
+	CString info;
+	if (!bQuiet)
+	{
+		BOOL bWarn = FALSE;
+		info = m_Commands.Compare(oldFn, newFn, logicalCol == 2, &bWarn);
+		if (bWarn && MessageBox(info + _T("\nChange it anyway?"), _T("Value Changer"), MB_YESNO | MB_ICONWARNING) != IDYES)
+			return false;
+	}
+	DWORD v = CCommandTable::FunctionToRef(newFn);
+	m_pFirmware->SetData(offset, (LPBYTE)&v, 4);
+	m_HexWnd.SetOffset(offset);
 	m_HexWnd.Invalidate();
 	RefreshSelection();
-	MessageBox(TEXT("Value changed successfully."), TEXT("Value Changer"), MB_OK);
+	UpdateCommandInfo();
+	if (!bQuiet)
+		MessageBox(_T("Value changed successfully.\n\n") + m_Commands.Describe(newFn) + _T("."), _T("Value Changer"), MB_OK);
 	return true;
+}
+
+// The line under the buttons says what the selected command cell runs (otherwise it describes the list, as always)
+void CLayoutDialog::UpdateCommandInfo()
+{
+	CWnd *pText = GetDlgItem(IDC_MODE_TEXT);
+	if (pText == NULL)
+		return;
+	if (m_ResourceType == 1 && (m_ClickedCol == 2 || m_ClickedCol == 3) && m_ValSize == 4 && m_pFirmware != NULL && m_Commands.IsValid() &&
+	    (ULONGLONG)m_ValOffset + 4 <= m_pFirmware->GetFirmwareSize())
+	{
+		int fn = CCommandTable::RefToFunction(*(const DWORD *)(m_pFirmware->GetFirmwareBuffer() + m_ValOffset));
+		if (fn >= 0 && m_Commands.FindFunction(fn) != NULL)
+		{
+			pText->SetWindowText(m_Commands.Describe(fn) + (m_ClickedCol == 2 ? _T(" (run when highlighted). Right click the cell to choose another command.")
+			                                                                 : _T(" (run when chosen). Right click the cell to choose another command.")));
+			return;
+		}
+	}
+	UpdateModeText();
+}
+
+// ---- the list of commands to choose from. It is a dialog built in memory, so the resource file does not change.
+
+enum { PK_SEARCH = 101, PK_GROUP, PK_SAME, PK_LIST, PK_INFO, PK_TEXT1, PK_TEXT2 };
+
+static void PutW(std::vector<BYTE> &b, WORD w) { b.push_back((BYTE)(w & 0xFF)); b.push_back((BYTE)(w >> 8)); }
+static void PutD(std::vector<BYTE> &b, DWORD d) { PutW(b, LOWORD(d)); PutW(b, HIWORD(d)); }
+static void PutS(std::vector<BYTE> &b, const WCHAR *s) { do PutW(b, *s); while (*s++); }
+static void PutAlign(std::vector<BYTE> &b) { while (b.size() % 4) b.push_back(0); }
+static void PutItem(std::vector<BYTE> &b, DWORD style, int x, int y, int cx, int cy, WORD id, const WCHAR *cls, const WCHAR *text)
+{
+	PutAlign(b);
+	PutD(b, style | WS_CHILD | WS_VISIBLE);
+	PutD(b, 0);
+	PutW(b, (WORD)x); PutW(b, (WORD)y); PutW(b, (WORD)cx); PutW(b, (WORD)cy);
+	PutW(b, id);
+	PutS(b, cls);
+	PutS(b, text);
+	PutW(b, 0);                                          // no creation data
+}
+
+// The template of the dialog (also used by the test program of the picker)
+static void BuildCommandPickTemplate(std::vector<BYTE> &b)
+{
+	b.clear();
+	PutD(b, DS_MODALFRAME | DS_SETFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU);
+	PutD(b, 0);
+	PutW(b, 9);                                          // number of controls
+	PutW(b, 0); PutW(b, 0); PutW(b, 360); PutW(b, 254);
+	PutW(b, 0);                                          // no menu
+	PutW(b, 0);                                          // standard class
+	PutS(b, L"Choose a command");
+	PutW(b, 8);
+	PutS(b, L"MS Shell Dlg");
+	PutItem(b, SS_LEFT, 7, 9, 30, 8, PK_TEXT1, L"STATIC", L"Search:");
+	PutItem(b, ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP, 40, 7, 150, 12, PK_SEARCH, L"EDIT", L"");
+	PutItem(b, SS_LEFT, 200, 9, 22, 8, PK_TEXT2, L"STATIC", L"Show:");
+	PutItem(b, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, 224, 7, 129, 120, PK_GROUP, L"COMBOBOX", L"");
+	PutItem(b, BS_AUTOCHECKBOX | WS_TABSTOP, 7, 24, 346, 10, PK_SAME, L"BUTTON", L"");
+	PutItem(b, LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 38, 346, 112, PK_LIST, L"SysListView32", L"");
+	PutItem(b, SS_LEFT, 7, 154, 346, 74, PK_INFO, L"STATIC", L"");
+	PutItem(b, BS_DEFPUSHBUTTON | WS_TABSTOP, 203, 234, 85, 14, IDOK, L"BUTTON", L"Use this command");
+	PutItem(b, BS_PUSHBUTTON | WS_TABSTOP, 293, 234, 60, 14, IDCANCEL, L"BUTTON", L"Cancel");
+}
+
+class CCommandPickDlg : public CDialog
+{
+public:
+	CCommandPickDlg(const CCommandTable *pCmds, int curId, BOOL bHilite, CWnd *pParent)
+		: m_pCmds(pCmds), m_CurId(curId), m_bHilite(bHilite), m_Chosen(-1), m_bReady(FALSE)
+	{
+		BuildCommandPickTemplate(m_Tpl);
+		InitModalIndirect((LPCDLGTEMPLATE)&m_Tpl[0], pParent);
+	}
+	int m_Chosen;
+
+protected:
+	struct Row { int id; CString text; CString group; int nParams; };
+
+	const CCommandTable *m_pCmds;
+	int m_CurId;
+	BOOL m_bHilite;
+	BOOL m_bReady;
+	std::vector<BYTE> m_Tpl;
+	std::vector<Row> m_Rows;
+	CListCtrl m_List;
+
+	static CString Lower(CString s) { s.MakeLower(); return s; }
+
+	BOOL Matches(const Row &r, const CString &words, const CString &group, BOOL bSame)
+	{
+		if (!group.IsEmpty() && r.group != group)
+			return FALSE;
+		if (bSame && !m_pCmds->UsedAs(r.id, m_bHilite ? CCommandTable::USE_HILITE : CCommandTable::USE_SELECT))
+			return FALSE;
+		CString hay, id;
+		id.Format(_T("%d"), r.id);
+		hay = Lower(id + _T(" ") + r.text + _T(" ") + r.group);
+		int pos = 0;
+		CString w = words.Tokenize(_T(" "), pos);
+		while (!w.IsEmpty())
+		{
+			if (hay.Find(w) < 0)
+				return FALSE;
+			w = words.Tokenize(_T(" "), pos);
+		}
+		return TRUE;
+	}
+
+	void Refill()
+	{
+		CString words;
+		GetDlgItemText(PK_SEARCH, words);
+		words = Lower(words);
+		words.Trim();
+		CString group;
+		CComboBox *pc = (CComboBox *)GetDlgItem(PK_GROUP);
+		if (pc->GetCurSel() > 0)
+			pc->GetLBText(pc->GetCurSel(), group);
+		BOOL bSame = IsDlgButtonChecked(PK_SAME) == BST_CHECKED;
+
+		int keep = m_Chosen;
+		POSITION pos = m_List.GetFirstSelectedItemPosition();
+		if (pos)
+			keep = (int)m_List.GetItemData(m_List.GetNextSelectedItem(pos));
+		m_List.SetRedraw(FALSE);
+		m_List.DeleteAllItems();
+		int sel = -1;
+		for (size_t i = 0; i < m_Rows.size(); i++)
+		{
+			const Row &r = m_Rows[i];
+			if (!Matches(r, words, group, bSame))
+				continue;
+			CString id, np;
+			id.Format(_T("%d"), r.id);
+			np.Format(_T("%d"), r.nParams);
+			int n = m_List.InsertItem(m_List.GetItemCount(), id);
+			m_List.SetItemText(n, 1, r.text);
+			m_List.SetItemText(n, 2, r.group);
+			m_List.SetItemText(n, 3, np);
+			m_List.SetItemData(n, r.id);
+			if (r.id == keep)
+				sel = n;
+		}
+		m_List.SetRedraw(TRUE);
+		if (sel >= 0)
+		{
+			m_List.SetItemState(sel, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
+			m_List.EnsureVisible(sel, FALSE);
+		}
+		ShowInfo();
+	}
+
+	void ShowInfo()
+	{
+		POSITION pos = m_List.GetFirstSelectedItemPosition();
+		CString info;
+		BOOL bOk = FALSE;
+		if (pos)
+		{
+			int id = (int)m_List.GetItemData(m_List.GetNextSelectedItem(pos));
+			BOOL bWarn = FALSE;
+			info = m_pCmds->Compare(m_CurId, id, m_bHilite, &bWarn);
+			info.Replace(_T("\n"), _T("\r\n"));
+			bOk = id != m_CurId;
+		}
+		else
+			info.Format(_T("%d command%s match. Choose one to see how it compares with the current command."), m_List.GetItemCount(), m_List.GetItemCount() == 1 ? _T("") : _T("s"));
+		SetDlgItemText(PK_INFO, info);
+		GetDlgItem(IDOK)->EnableWindow(bOk);
+	}
+
+	virtual BOOL OnInitDialog()
+	{
+		CDialog::OnInitDialog();
+		m_List.Attach(GetDlgItem(PK_LIST)->m_hWnd);
+		m_List.SetExtendedStyle(LVS_EX_FULLROWSELECT);
+		m_List.InsertColumn(0, _T("Command"), LVCFMT_LEFT, 62);
+		m_List.InsertColumn(1, _T("Name, or where it is used"), LVCFMT_LEFT, 250);
+		m_List.InsertColumn(2, _T("Kind"), LVCFMT_LEFT, 120);
+		m_List.InsertColumn(3, _T("Parameters"), LVCFMT_LEFT, 70);
+
+		std::set<CString> groups;
+		for (int i = 0; i < m_pCmds->GetNumFunctions(); i++)
+		{
+			Row r;
+			r.id = m_pCmds->GetFunctionId(i);
+			const PixoScript::Function *pf = m_pCmds->FindFunction(r.id);
+			r.nParams = pf ? pf->nParams : 0;
+			r.text = m_pCmds->Name(r.id);
+			if (r.text.IsEmpty())
+				r.text = m_pCmds->Role(r.id);
+			if (r.text.IsEmpty())
+				r.text = _T("(no menu entry uses it)");
+			r.group = m_pCmds->Group(r.id);
+			groups.insert(r.group);
+			m_Rows.push_back(r);
+		}
+		CComboBox *pc = (CComboBox *)GetDlgItem(PK_GROUP);
+		pc->AddString(_T("All kinds"));
+		for (std::set<CString>::const_iterator it = groups.begin(); it != groups.end(); ++it)
+			pc->AddString(*it);
+		pc->SetCurSel(0);
+
+		CString lbl;
+		lbl.Format(_T("Only commands that menus use as %s commands (the safest choice)"), m_bHilite ? _T("highlight") : _T("select"));
+		SetDlgItemText(PK_SAME, lbl);
+		CString title;
+		title.Format(_T("Choose a %s command"), m_bHilite ? _T("highlight") : _T("select"));
+		SetWindowText(title);
+		// the list starts with the commands used the same way, unless the current one is not among them
+		CheckDlgButton(PK_SAME, m_pCmds->UsedAs(m_CurId, m_bHilite ? CCommandTable::USE_HILITE : CCommandTable::USE_SELECT) ? BST_CHECKED : BST_UNCHECKED);
+		m_Chosen = m_CurId;
+		m_bReady = TRUE;
+		Refill();
+		GetDlgItem(PK_SEARCH)->SetFocus();
+		return FALSE;
+	}
+
+	virtual void OnOK()
+	{
+		POSITION pos = m_List.GetFirstSelectedItemPosition();
+		if (!pos)
+			return;
+		m_Chosen = (int)m_List.GetItemData(m_List.GetNextSelectedItem(pos));
+		if (m_Chosen == m_CurId)
+			return;
+		CDialog::OnOK();
+	}
+
+	afx_msg void OnFilter() { if (m_bReady) Refill(); }
+	afx_msg void OnListChanged(NMHDR *, LRESULT *pResult) { *pResult = 0; if (m_bReady) ShowInfo(); }
+	afx_msg void OnListDbl(NMHDR *, LRESULT *pResult) { *pResult = 0; OnOK(); }
+	afx_msg void OnDestroy() { m_List.Detach(); CDialog::OnDestroy(); }
+
+	DECLARE_MESSAGE_MAP()
+};
+
+BEGIN_MESSAGE_MAP(CCommandPickDlg, CDialog)
+	ON_EN_CHANGE(PK_SEARCH, OnFilter)
+	ON_CBN_SELCHANGE(PK_GROUP, OnFilter)
+	ON_BN_CLICKED(PK_SAME, OnFilter)
+	ON_NOTIFY(LVN_ITEMCHANGED, PK_LIST, OnListChanged)
+	ON_NOTIFY(NM_DBLCLK, PK_LIST, OnListDbl)
+	ON_WM_DESTROY()
+END_MESSAGE_MAP()
+
+// Right click on a command cell of a menu: choose another command from the list
+bool CLayoutDialog::MenuPickCommand(int item, int logicalCol)
+{
+	int sel_id = _ttoi(m_ResourceTree.GetItemText(m_ResourceTree.GetSelectedItem()));
+	LPBYTE lpBuf = m_pFirmware->GetFirmwareBuffer();
+	for (size_t j = 0; MenuList != NULL && j < MenuList->size(); j++)
+	{
+		if (MenuList->at(j)->id != sel_id)
+			continue;
+		if (item < 0 || item >= MenuList->at(j)->num_elems)
+			return false;
+		const resource_type_menu_elem *e = MenuList->at(j)->MenuElemList[item]->element;
+		DWORD rel = 0, sz = 0;
+		m_Attrs.MenuField(logicalCol, &rel, &sz);
+		if (sz != 4)
+			return false;
+		DWORD offset = (DWORD)((const BYTE *)e - lpBuf) + rel;
+		int oldFn = CCommandTable::RefToFunction(*(const DWORD *)(lpBuf + offset));
+		CCommandPickDlg dlg(&m_Commands, oldFn, logicalCol == 2, this);
+		if (dlg.DoModal() != IDOK || dlg.m_Chosen < 0)
+			return false;
+		return MenuRelink(logicalCol, offset, dlg.m_Chosen, true);
+	}
+	return false;
 }
 
 // Right click on an entry of the tree: find the commands that mention its number
@@ -1399,4 +2302,88 @@ void CLayoutDialog::OnNMRClickResourceTree(NMHDR *pNMHDR, LRESULT *pResult)
 	m_ResourceTypeIdx.SetCurSel(3);
 	OnCbnSelchangeResourceTypeidxCombo();
 	CmdFind(false);
+}
+
+// For the hex view: the function record of the command table that holds the byte at pos (its number, the header, the code and the padding
+// after it), so the grey behind a selected command starts at the command and not at the start of the whole table.
+BOOL CLayoutDialog::HexExtentHook(void *ctx, DWORD pos, DWORD *pStart, DWORD *pLen)
+{
+	CLayoutDialog *pThis = (CLayoutDialog *)ctx;
+	if (pThis == NULL)
+		return FALSE;
+
+	// a layout or a menu: the element (one row of the list) that holds pos. An element is its size field and the number of bytes the field says
+	// follow it, so the grey runs from the start of that element and not over the whole layout.
+	if (pThis->m_pFirmware != NULL && (pThis->m_ResourceType == 0 || pThis->m_ResourceType == 1) && pThis->m_ResourceTree.m_hWnd != NULL)
+	{
+		HTREEITEM it = pThis->m_ResourceTree.GetSelectedItem();
+		LPBYTE lpBuf = pThis->m_pFirmware->GetFirmwareBuffer();
+		if (it != NULL && lpBuf != NULL)
+		{
+			int sel_id = _ttoi(pThis->m_ResourceTree.GetItemText(it));
+			if (pThis->m_ResourceType == 0 && pThis->ViewList != NULL)
+			{
+				for (size_t j = 0; j < pThis->ViewList->size(); j++)
+				{
+					if (pThis->ViewList->at(j)->id != sel_id)
+						continue;
+					for (int k = 0; k < pThis->ViewList->at(j)->num_elems; k++)
+					{
+						const resource_type_view_elem *e = pThis->ViewList->at(j)->ViewElemList[k]->element;
+						DWORD start = (DWORD)((const BYTE *)e - lpBuf);
+						DWORD len = e->size + 4;
+						if (e->size >= 0x20 && e->size < 0x1000 && pos >= start && pos - start < len)
+						{
+							*pStart = start;
+							*pLen = len;
+							return TRUE;
+						}
+					}
+					break;
+				}
+			}
+			else if (pThis->m_ResourceType == 1 && pThis->MenuList != NULL)
+			{
+				for (size_t j = 0; j < pThis->MenuList->size(); j++)
+				{
+					if (pThis->MenuList->at(j)->id != sel_id)
+						continue;
+					for (int k = 0; k < pThis->MenuList->at(j)->num_elems; k++)
+					{
+						const resource_type_menu_elem *e = pThis->MenuList->at(j)->MenuElemList[k]->element;
+						DWORD start = (DWORD)((const BYTE *)e - lpBuf);
+						DWORD len = (DWORD)e->size + 4;
+						if (e->size >= 0x20 && e->size < 0x1000 && pos >= start && pos - start < len)
+						{
+							*pStart = start;
+							*pLen = len;
+							return TRUE;
+						}
+					}
+					break;
+				}
+			}
+		}
+	}
+
+	if (!pThis->m_Commands.IsValid())
+		return FALSE;
+	DWORD resStart = pThis->m_Commands.GetResourceOffset();
+	if (pos < resStart || pos - resStart >= pThis->m_Commands.GetResourceSize())
+		return FALSE;
+	for (int i = 0; i < pThis->m_Commands.GetNumFunctions(); i++)
+	{
+		const Function *pf = pThis->m_Commands.FindFunction(pThis->m_Commands.GetFunctionId(i));
+		if (pf == NULL)
+			continue;
+		DWORD start = pThis->m_Commands.GetFunctionOffset(*pf);
+		DWORD len = pThis->m_Commands.Script().GetRecordLength(*pf);
+		if (pos >= start && pos - start < len)
+		{
+			*pStart = start;
+			*pLen = len;
+			return TRUE;
+		}
+	}
+	return FALSE;
 }

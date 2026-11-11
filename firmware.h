@@ -26,6 +26,7 @@ struct PARTITION_INFO
 	BOOL	bCanModify;
 	DWORD	checksumStartAddress;
 	DWORD	checksumExtra;	// bytes the sum covers beyond the image length (version 0 images: the 2048 in front of it)
+	DWORD	checksumTrim;	// bytes at the end of that range the sum leaves out (version 0 images: the sum is [devOffset-2048, +len), so the last 2048 are not in it)
 	BOOL	bSealed;		// the "dpua" image has been put back to the form it has in the file (SyncChecksum); the program works on it decrypted
 };
 
@@ -477,6 +478,8 @@ private:
 	TypeTable TypeRecList;
 	TCMDTable TCMDRecList;
 	ScriptTable ScriptRecList;
+	struct ResBlockInfo { DWORD offset; DWORD dataBegin; DWORD numSections; };   // where a block of resources starts, and its data (found by ScanFirmware)
+	vector<ResBlockInfo> m_ResBlocks;
 
 	int		m_NumPartitions;
 	IPOD_PARTITION_HEADER *	m_pPartitions;
@@ -501,7 +504,13 @@ public:
 	void	RestoreWorkingForm();             // takes it out of that form once the write is done: the program works on the "dpua" image decrypted (the boot pictures are read from it)
 
 	int		GetNumPartitions();
+	BOOL	GetImageRange(const char *id, DWORD *pStart, DWORD *pLen);   // where the image with that ID ("soso": the operating system) is in the buffer
+	BOOL	FindResourceExtent(DWORD pos, DWORD *pStart, DWORD *pLen);   // the resource that holds the byte at pos: where it starts and how long it is (its tables when pos is in the tables of its block)
 	void	GetPartitionChecksums(int index, LPDWORD pChecksum1, LPDWORD pChecksum2);
+	void	RaiseUpdaterVersions();           // see below
+	static long DiskOffsetDelta(const BYTE *buf, long partitionStart);   // see firmware.cpp: how far the offsets of a format 0 firmware move for a partition start
+	static BOOL RebaseOffsets(LPBYTE buf, long delta);                   // adds delta to the image offsets of the table in buf (not the loaded firmware)
+	CString	GetBootloaderDate(int index);     // the build date of the bootloader in a "dpua" (updater) image, as yy/mm/dd, e.g. "03/04/19" for Apr 19 2003 (empty when the image has none or is not readable)
 
 	BOOL	CanWrite(DWORD offset, DWORD len);
 
@@ -553,6 +562,12 @@ public:
 	BOOL DecryptAUPD(int partition);  // the cipher works both ways; TRUE when the image was changed
 	LPBYTE GetAUPDBuffer();
 	void ResetImageAdresses();
+	BOOL GetBootloaderRanges(DWORD &hdrEnd, DWORD &blStart, DWORD &blEnd);   // what a write is checked on: the header + table [0, hdrEnd) and the "dpua" image (bootloader / updater) [blStart, blEnd)
+	DWORD GetPartitionVersion(int index);   // the version of the image in the table of images (the Version column; the bootloader of an iPod only runs an updater image that is not below its hardware's minimum)
+	BOOL FindClickSites(vector<DWORD> &pitch, vector<DWORD> &len, BOOL *pImm = NULL);
+	BOOL FindClickSitesSR(vector<DWORD> &pitch, vector<DWORD> &len);   // (the form with a literal length)   // the click: where the pitch number (low byte of movne r0,#N) and the length (a literal, microseconds) are, found by the instructions, not by their values
+	BOOL GetLcdInvertSites(vector<DWORD> &sites, BYTE v[4], DWORD *pInitSite, BOOL *pWide, vector<DWORD> *pSkip, vector<DWORD> *pConst);   // 4G 4.3.x: the instruction (orreq r0,r0,#N) that sets bit 1 of the LCD display control register: N = 3 inverts the screen, 1 is the stock value
+	int ReflashPartition();           // the "dpua" image whose flash byte every reflash function reads / changes (-1: none)
 	BOOL ReflashByteSet();            // the flash byte of the "dpua" image is not 0: the iPod does not flash it by itself
 	BOOL CanFlipReflashByte();        // the firmware has a "dpua" image whose flash byte can be changed
 	void FlipReflashByte();           // flash byte 0 <-> 1 in the loaded firmware (kept when saved)
@@ -561,6 +576,8 @@ public:
 private:
 	int m_FlashResetPart;             // the partition whose flash address was set to 0, -1 none
 	DWORD m_FlashResetValue;          // what it was
+	DWORD m_VersionReset[10];         // the table versions before RaiseUpdaterVersions (valid where m_VersionRaised)
+	BOOL m_VersionRaised;
 };
 
 static int offset[8]={0x5,0x25,0x6f,0x69,0x15,0x4d,0x40,0x34};

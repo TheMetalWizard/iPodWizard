@@ -23,6 +23,8 @@
 #include <map>
 #include <set>
 
+class CNativeTable;
+
 namespace PixoScript
 {
 	enum RefType
@@ -30,7 +32,8 @@ namespace PixoScript
 		REF_NONE     = 0,      // only says where something is stored (value is not used)
 		REF_FUNCTION = 1,      // value is a function ID of this script
 		REF_CONSTANT = 2,      // value is a number that may be the ID of a view, menu, string, bitmap or font style
-		REF_MENU     = 3       // value is a menu ID (used by the lists built around the script)
+		REF_MENU     = 3,      // value is a menu ID (used by the lists built around the script)
+		REF_NATIVE   = 4       // value is the atom of an object or method the firmware implements itself (see NativeTable.h)
 	};
 
 	// Something a line of the listing refers to. Besides what it points at it knows which part of the line's text
@@ -128,6 +131,8 @@ namespace PixoScript
 		int  GetNumAtoms() const { return (int)m_AtomOffsets.size(); }
 		CString GetAtomName(int atom) const;                   // "" when unknown
 		void SetExternalNames(const std::map<int, CString> *pNames) { m_pNames = pNames; }
+		void SetNativeTable(const CNativeTable *pNative) { m_pNative = pNative; }
+		BOOL IsNativeAtom(int atom) const;                     // an object or a method the firmware implements itself
 		CString AtomText(int atom) const;                      // the name, or a<number>
 
 		int  GetNumConstants() const { return (int)m_Keys.size(); }
@@ -137,6 +142,7 @@ namespace PixoScript
 
 		// decoding
 		BOOL Decode(const Function &f, std::vector<Instruction> &out) const;
+		BOOL Verify(const Function &f, CString *pMsg) const;           // do the instructions hang together (stack depth, jumps, arguments, variables)?
 		BOOL Disassemble(const Function &f, std::vector<Line> &out) const;
 		BOOL Decompile(const Function &f, std::vector<Line> &out, BOOL *pbClean = NULL) const;
 
@@ -158,6 +164,7 @@ namespace PixoScript
 		DWORD m_dwPoolBase;
 		DWORD m_dwKeysOffset;                                  // where the table of constants starts
 		const std::map<int, CString> *m_pNames;
+		const CNativeTable *m_pNative;
 
 		friend class CDecompiler;
 	};

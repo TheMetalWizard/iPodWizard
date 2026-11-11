@@ -78,7 +78,7 @@ CAPTION "About iPodWizard"
 FONT 8, "MS Shell Dlg", 0, 0, 0x1
 BEGIN
     ICON            IDR_MAINFRAME,IDC_ABOUT_ICON,78,6,44,42,SS_NOTIFY
-    CTEXT           "iPodWizard Version 1.3.4e",IDC_STATIC,0,52,200,8,SS_NOPREFIX
+    CTEXT           "iPodWizard Version 1.3.6",IDC_STATIC,0,52,200,8,SS_NOPREFIX
     CTEXT           "©2004 TheWizard",IDC_STATIC,0,62,200,8
     CTEXT           "©2005-2007 Kingstone",IDC_STATIC,0,71,200,8
     CTEXT           "©2022 Stehfyn",IDC_STATIC,0,80,200,8
@@ -105,13 +105,11 @@ END
 IDD_IPODWIZARD_DIALOG DIALOGEX 0, 0, 450, 380
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
 EXSTYLE WS_EX_APPWINDOW
-CAPTION "iPodWizard v1.3.4e"
+CAPTION "iPodWizard v1.3.6"
 FONT 8, "MS Shell Dlg", 0, 0, 0x1
 BEGIN
     GROUPBOX        "",IDC_STATIC,152,2,62,56
     PUSHBUTTON      "&Select",ID_LOAD_FIRMWARE,93,11,46,14,WS_DISABLED
-    LTEXT           "Firmware:",IDC_STATIC,190,12,196,8,NOT WS_VISIBLE
-    COMBOBOX        IDC_FIRMWARE_COMBO,229,12,155,120,CBS_DROPDOWNLIST | NOT WS_VISIBLE | WS_VSCROLL | WS_TABSTOP
 
     GROUPBOX        "iPod Detector",IDC_IPODDETECTOR_GROUP,4,30,142,28
     COMBOBOX        IDC_IPODDRIVE_COMBO,11,41,78,120,CBS_DROPDOWNLIST | NOT WS_VISIBLE | WS_VSCROLL | WS_TABSTOP
@@ -288,7 +286,7 @@ BEGIN
     PUSHBUTTON      "Translate",IDC_TRANSLATE_BUTTON,168,7,38,14,WS_DISABLED
 END
 
-IDD_TWEAKS_DIALOG DIALOGEX 0, 0, 149, 238
+IDD_TWEAKS_DIALOG DIALOGEX 0, 0, 149, 286
 STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
@@ -309,6 +307,10 @@ BEGIN
     LTEXT           "Firmware tweaks",IDC_STATIC,7,160,300,10
     PUSHBUTTON      "Enable reflash byte",IDC_FLIP_REFLASH_BUTTON,7,174,90,14
     PUSHBUTTON      "Volume Hack",IDC_TWEAKS_VOLUMEHACK,7,192,90,14,WS_DISABLED
+    PUSHBUTTON      "C&hange Selector Bar Color",IDC_SELECTORBAR_BUTTON,7,210,90,14,WS_DISABLED
+    PUSHBUTTON      "Clicker &Tone",IDC_CLICKPITCH_BUTTON,7,228,90,14,WS_DISABLED
+    PUSHBUTTON      "Enable screen invert",IDC_LCDINVERT_BUTTON,7,246,90,14,WS_DISABLED
+    LTEXT           "Compatible with the 1/2/3/4G/Mini",IDC_STATIC,7,263,135,18
 END
 
 IDD_HELP_DIALOG DIALOGEX 0, 0, 300, 295
@@ -441,6 +443,75 @@ BEGIN
     CTEXT           "Ensure iPodWizard is running as administrator, and no other applications are using the iPod.",IDC_STATIC,10,43,200,17
     DEFPUSHBUTTON   "OK",IDOK,110,71,50,14
     PUSHBUTTON      "Cancel",IDCANCEL,163,71,50,14
+END
+
+IDD_WRITE_DONE DIALOGEX 0, 0, 260, 90
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "iPodWizard"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Successfully written to your iPod!",IDC_STATIC,10,10,240,10
+    CONTROL         "",IDC_DONE_CHECK,"Static",SS_OWNERDRAW,10,26,240,10
+    LTEXT           "Warning: According to Apple's EULA, modifying && distributing firmwares is prohibited. Firmwares are without warranty for personal use only.",IDC_STATIC,10,44,240,22
+    DEFPUSHBUTTON   "OK",IDOK,200,69,50,14
+END
+
+IDD_CLICK_PITCH DIALOGEX 0, 0, 230, 124
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Clicker Tone"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Pitch number (1 - 255):",IDC_CLICKPITCH_LABEL,10,9,86,10
+    EDITTEXT        IDC_CLICKPITCH_EDIT,100,6,36,14,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "",IDC_CLICKPITCH_INFO,10,26,210,10
+    LTEXT           "Frequencies above 16 kHz are unlikely to be audible.",IDC_CLICKPITCH_NOTE,10,39,210,10
+    LTEXT           "Length (100 - 100000):",IDC_CLICKLEN_LABEL,10,62,90,10
+    EDITTEXT        IDC_CLICKLEN_EDIT,104,59,46,14,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "",IDC_CLICKLEN_INFO,10,79,210,10
+    PUSHBUTTON      "Stock",IDC_CLICKSTOCK_BUTTON,10,103,50,14
+    DEFPUSHBUTTON   "OK",IDOK,116,103,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,170,103,50,14
+END
+
+IDD_CLICK_FWLIST DIALOGEX 0, 0, 230, 176
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Clicker Tone"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "The clicker tone was not found in the firmware, which means it was most likely changed from default. Select the firmware currently loaded onto your iPod to modify it.",IDC_STATIC,10,6,210,36
+    LISTBOX         IDC_CLICKFW_LIST,10,46,210,104,LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,116,155,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,170,155,50,14
+END
+
+IDD_BOOTLOADER_RECOVERY DIALOGEX 0, 0, 290, 196
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Bootloader Recovery"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "You have written a firmware which will reflash the iPod once it ejects.",IDC_STATIC,10,10,270,10
+    LTEXT           "The bootloader check has failed, which can cause an unrecoverable firmware.",IDC_STATIC,10,24,270,10
+    LTEXT           "If writing a custom bootloader was not the goal, immediately follow these steps:",IDC_STATIC,10,42,270,18
+    LTEXT           "1. Read these steps thoroughly.",IDC_STATIC,18,64,262,10
+    LTEXT           "2. Close the warning messages",IDC_STATIC,18,77,262,10
+    LTEXT           "3. Enter 'Firmware Binary' edit mode",IDC_STATIC,18,90,262,10
+    LTEXT           "4. Open a stock, non-modified binary, compatible with your iPod.",IDC_STATIC,18,103,262,10
+    LTEXT           "5. Go into the tweaks tab",IDC_STATIC,18,116,262,10
+    LTEXT           "6. Enable reflash",IDC_STATIC,18,129,262,10
+    LTEXT           "7. Write to iPod",IDC_STATIC,18,142,262,10
+    LTEXT           "8. Eject.",IDC_STATIC,18,155,262,10
+    DEFPUSHBUTTON   "Close",IDCANCEL,230,175,50,14
+END
+
+IDD_BOOT_CHECK_FAILED DIALOGEX 0, 0, 240, 82
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Write check failed"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_BOOTCHECK_TITLE,"Static",SS_OWNERDRAW,10,10,220,12
+    LTEXT           "Before ejecting manually, write a backup, known good firmware to prevent potentially unrecoverable corruption.",IDC_STATIC,10,30,220,26
+    PUSHBUTTON      "Help",IDC_BOOTCHECK_HELP,125,62,50,14
+    DEFPUSHBUTTON   "OK",IDOK,180,62,50,14
 END
 
 IDD_VOLUME_HACK DIALOGEX 0, 0, 300, 82
@@ -585,7 +656,6 @@ BEGIN
     CONTROL         "Decimal",IDC_RADIO_DECVAL,"Button",BS_AUTORADIOBUTTON,324,41,37,10
     PUSHBUTTON      "Save All",IDC_SAVEALLRESOURCES_BUTTON,136,7,34,14,WS_DISABLED
     PUSHBUTTON      "Load All",IDC_LOADALLRESOURCES_BUTTON,173,7,34,14,WS_DISABLED
-    PUSHBUTTON      "C&hange Selector Bar Color",IDC_SELECTORBAR_BUTTON,331,7,90,14,WS_DISABLED
 END
 
 IDD_PREFS_DIALOG DIALOGEX 0, 0, 441, 300
@@ -614,13 +684,15 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | BS_LEFT | WS_TABSTOP,14,158,260,13
     CONTROL         "Don't load all firmware global independent strings",IDC_CHK_ALLSTRINGS,
                     "Button",BS_AUTOCHECKBOX | BS_LEFT | WS_TABSTOP,14,172,200,13
-    GROUPBOX        "Advanced",IDC_STATIC,7,192,427,68
+    CONTROL         "Eject automatically after writing to iPod",IDC_CHK_AUTOEJECT,
+                    "Button",BS_AUTOCHECKBOX | BS_LEFT | WS_TABSTOP,14,186,300,13
+    GROUPBOX        "Advanced",IDC_STATIC,7,206,427,68
     CONTROL         "Allow font style && size editing",IDC_CHK_FONTEDIT,
-                    "Button",BS_AUTOCHECKBOX | BS_LEFT | WS_TABSTOP,14,207,300,13
-    CONTROL         "Reflash firmware when writing to iPod",IDC_CHK_FORCEREFLASH,
                     "Button",BS_AUTOCHECKBOX | BS_LEFT | WS_TABSTOP,14,221,300,13
+    CONTROL         "Reflash firmware when writing to iPod",IDC_CHK_FORCEREFLASH,
+                    "Button",BS_AUTOCHECKBOX | BS_LEFT | WS_TABSTOP,14,235,300,13
     CONTROL         "Never reflash: overwrite the reflash byte when writing to iPod",IDC_CHK_NOREFLASH,
-                    "Button",BS_AUTOCHECKBOX | BS_LEFT | WS_TABSTOP,14,235,400,13
+                    "Button",BS_AUTOCHECKBOX | BS_LEFT | WS_TABSTOP,14,249,400,13
 END
 
 IDD_THEMEPREVIEWER DIALOGEX 0, 0, 366, 176
@@ -651,8 +723,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,3,4,5
- PRODUCTVERSION 1,3,4,5
+ FILEVERSION 1,3,6,0
+ PRODUCTVERSION 1,3,6,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x9L
@@ -669,13 +741,13 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "NoCompany - TheMetalWizard"
             VALUE "FileDescription", "iPod Firmware Modifier"
-            VALUE "FileVersion", "1.3.4e"
+            VALUE "FileVersion", "1.3.6"
             VALUE "InternalName", "iPodWizard.exe"
             VALUE "LegalCopyright", " (c) iPodWizard and TheMetalWizard.  All rights reserved."
             VALUE "OriginalFilename", "iPodWizard.exe"
             VALUE "PrivateBuild", "0101"
             VALUE "ProductName", "iPodWizard"
-            VALUE "ProductVersion", "1.3.4e"
+            VALUE "ProductVersion", "1.3.6"
         END
     END
     BLOCK "VarFileInfo"

@@ -31,6 +31,7 @@ CFirmware::CFirmware()
 	m_StringOrderFixed = FALSE;
 	m_FlashResetPart = -1;
 	m_FlashResetValue = 0;
+	m_VersionRaised = FALSE;
 }
 
 CFirmware::~CFirmware()
@@ -50,6 +51,7 @@ void CFirmware::Reset()
 
 	m_Buffer = NULL;
 	m_FlashResetPart = -1;                 // a reset of the firmware before does not belong to this one
+	m_VersionRaised = FALSE;
 	m_BufferSize = 0;
 
 	m_NumPartitions = 0;
@@ -107,6 +109,7 @@ void CFirmware::Reset()
 
 	m_SLangOffset = 0;
 	m_StringOrderFixed = FALSE;
+	m_ResBlocks.clear();
 }
 
 DWORD CFirmware::GetFirmwareVersion()
@@ -145,6 +148,7 @@ BOOL CFirmware::SetFirmware(LPCTSTR name, LPBYTE buffer, DWORD size)
 	{
 		m_PartitionInfo[m_NumPartitions].checksumStartAddress = m_pPartitions[m_NumPartitions].devOffset;
 		m_PartitionInfo[m_NumPartitions].checksumExtra = 0;
+		m_PartitionInfo[m_NumPartitions].checksumTrim = 0;
 		m_PartitionInfo[m_NumPartitions].bSealed = FALSE;
 
 		if (strncmp(m_pPartitions[m_NumPartitions].id, "soso", 4)==0 || strncmp(m_pPartitions[m_NumPartitions].id, "crsr", 4)==0)
@@ -159,9 +163,11 @@ BOOL CFirmware::SetFirmware(LPCTSTR name, LPBYTE buffer, DWORD size)
 			//elsewhere, if it's 2 then it's 1-3g
 			if (firmware_version==0 && m_pPartitions[m_NumPartitions].devOffset>=2048)
 			{
-				//first 2nd generation software (1.1.0.2, 1.1.0.4): the sum starts 2048 bytes before the image
+				//first software (1.0.0, 1.1.0.2, 1.1.0.4): the sum starts 2048 bytes before the image and is as long as the image (measured on all
+				//three: [devOffset-2048, +len); in 1.1.0.x the 2048 bytes after it are zeros, in 1.0.0 the next image is there)
 				m_PartitionInfo[m_NumPartitions].checksumStartAddress -= 2048;
 				m_PartitionInfo[m_NumPartitions].checksumExtra = 2048;
+				m_PartitionInfo[m_NumPartitions].checksumTrim = 2048;
 			}
 			else if (firmware_version!=2) //it's either 3 or we don't know this firmware but heck let's try checksum anyway
 				m_PartitionInfo[m_NumPartitions].checksumStartAddress += theApp.BLOCK_SIZE;
@@ -183,7 +189,15 @@ BOOL CFirmware::SetFirmware(LPCTSTR name, LPBYTE buffer, DWORD size)
 		else if (strncmp(m_pPartitions[m_NumPartitions].id, "dpua", 4)==0)
 		{
 			m_PartitionInfo[m_NumPartitions].bCanModify = TRUE;
-			if (firmware_version!=2)
+			if (firmware_version==0 && m_pPartitions[m_NumPartitions].devOffset>=2048)
+			{
+				// same range as the OS image of that software
+				m_PartitionInfo[m_NumPartitions].checksumStartAddress -= 2048;
+				m_PartitionInfo[m_NumPartitions].checksumExtra = 2048;
+				m_PartitionInfo[m_NumPartitions].checksumTrim = 2048;
+				DecryptAUPD(m_NumPartitions);
+			}
+			else if (firmware_version!=2)
 			{
 				m_PartitionInfo[m_NumPartitions].checksumStartAddress += theApp.BLOCK_SIZE;
 				DecryptAUPD(m_NumPartitions);
@@ -210,84 +224,365 @@ BOOL CFirmware::SetFirmware(LPCTSTR name, LPBYTE buffer, DWORD size)
 	return TRUE;
 }
 
-void CFirmware::ResetImageAdresses()
+// THE reflash byte: the "flash" field (the image instance index) of the first "dpua" image of the table. The Tweaks button (FlipReflashByte), Preferences > Advanced "Reflash firmware when
+// writing to iPod" (ResetImageAdresses), "Never reflash" (PreventReflash) and the question a write asks (ReflashByteSet) all go through this one function, so they read and change the
+// SAME byte. (Checked 2026-11-11 against 1.0.0, 1.1.0.2, 1.1.4, 1.1.5 and the 3G firmwares: every one has exactly one "dpua" entry; format 0 files have their only table at 0x4000, format 2
+// files are read and changed in the copy at 0x4200.) -1 when the firmware has no such image.
+int CFirmware::ReflashPartition()
 {
-	int i;
-	/*DWORD savedAddr=0;
+	for (int i = 0; i < m_NumPartitions; i++)
+		if (!strncmp(m_pPartitions[i].id, "dpua", 4))
+			return i;
+	return -1;
+}
 
-	for (i = 0; i < m_NumPartitions; i++)
+// The parts of the firmware file whose damage can brick an iPod: the header with the table of images (the bootloader reads it to find everything) and the "dpua" image (the bootloader, disk mode and the
+// updater). A write is read back and compared on these only (CiPodWizardDlg::VerifyBootloader); the main firmware ("soso") is not checked: a bad write there is fixed by writing again, while the bootloader
+// has to be right before the iPod is restarted. Offsets are positions in the file / on the firmware partition. The first software (format 0) counts its images from 2048 bytes before their data (see the
+// checksum range above), the 512 byte block that later images carry in front of their data is inside [blStart, blEnd) too. false when the firmware has no "dpua" image.
+BOOL CFirmware::GetBootloaderRanges(DWORD &hdrEnd, DWORD &blStart, DWORD &blEnd)
+{
+	int d = ReflashPartition();
+	if (d < 0 || m_Buffer == NULL)
+		return FALSE;
+	const BOOL first = (WORD)m_Buffer[266] == 0;
+	DWORD lowest = 0xFFFFFFFF;
+	for (int i = 0; i < m_NumPartitions; i++)
 	{
-		if (!strncmp(m_pPartitions[i].id, "soso", 4))
-			savedAddr=m_pPartitions[i].loadAddr;
-	}*/
+		DWORD o = m_pPartitions[i].devOffset;
+		if (m_pPartitions[i].len == 0)
+			continue;
+		if (first && o >= 2048)
+			o -= 2048;
+		if (o < lowest)
+			lowest = o;
+	}
+	if (lowest == 0xFFFFFFFF)
+		return FALSE;
+	hdrEnd = lowest;
+	DWORD dev = m_pPartitions[d].devOffset;
+	blStart = (first && dev >= 2048) ? dev - 2048 : dev;
+	blEnd = dev + m_pPartitions[d].len + (theApp.BLOCK_SIZE > 0 ? theApp.BLOCK_SIZE : 512);
+	if (blEnd > GetFirmwareSize())
+		blEnd = GetFirmwareSize();
+	return blStart < blEnd;
+}
 
-	//if (savedAddr!=0)
-	//{
-		for (i = 0; i < m_NumPartitions; i++)
+DWORD CFirmware::GetPartitionVersion(int index)
+{
+	return (m_pPartitions != NULL && index >= 0 && index < m_NumPartitions) ? m_pPartitions[index].version : 0;
+}
+
+// The click: the firmware plays it with sound_request(N, L): "pitch number N for L microseconds"; the sequencer writes N | 0x80800000 to the clicker register 0x7000A000 and arms a timer for L
+// microseconds, so the pitch is 93750 / (N + 1) Hz [measured on a 4G]. Every firmware of the 4G family that the archive holds (4G, 4G photo, mini 1G / 2G, nano 1G, 5G 13.x and the 5.5G) has the
+// same sound_request, which is found by its first instructions (SIG: the message it builds and the queue 0x15 it puts it in). The CLICK is the only CONDITIONAL call of it with a constant pitch:
+// "ldr<c> r1,[pc,#X] / mov<c> r0,#N / ... / bl<c> sound_request" (c = ne in the 4G, mini, photo, nano and 5.5G, eq in the 5G 13.x; the other sounds are unconditional). The stock values are N = 85
+// (1090 Hz) and L = 3000. The sites are found by these instructions and not by their values, so a firmware whose click was changed before (any N, any L) is found the same way. Only the "soso"
+// image is looked at. pitch: buffer offsets of the mov instructions (the low byte is N); len: buffer offsets of the literals (L). FALSE when there is no such call (the 1G / 2G / 3G have another
+// sound code), or more than 4. [the pitch formula was measured on a real 4G; this patch, and every other iPod, are NOT tried on hardware]
+// The 3G has the same sound_request (queue 0x14), but its click is "tst r0,#1 / movne r1,#L / movne r0,#N / bne sound_request" with both numbers as immediates (stock N = 100, L = 100; found in
+// 2.2.0.0 - 2.2.3 and the Stacker prototype). The 3G's hardware is another chip: the sound task (queue 0x14) writes N as a 16-bit value to the registers 0xC0006040 / 0xC0006044 and holds it for L microseconds of the clock 0xCF001110 [read in the code, not heard]; what N is as a frequency is not known. L is a rotated 8-bit immediate (the low 12 bits of the instruction), so the stock L = 100 is a tick; the dialog writes the rotation too. When this is the form, *pImm is TRUE, len holds the
+// offsets of the "movne r1,#L" instructions (the low byte is L) and the readouts of the dialog do not claim a frequency.
+BOOL CFirmware::FindClickSites(vector<DWORD> &pitch, vector<DWORD> &len, BOOL *pImm)
+{
+	if (pImm != NULL)
+		*pImm = FALSE;
+	if (FindClickSitesSR(pitch, len))
+		return TRUE;
+	pitch.clear();
+	len.clear();
+	DWORD start, ilen;
+	if (m_Buffer == NULL || !GetImageRange("soso", &start, &ilen))
+		return FALSE;
+	DWORD end = start + ilen;
+	if (end > m_BufferSize)
+		end = m_BufferSize;
+	DWORD target = 0;
+	BOOL have = FALSE;
+	for (DWORD o = start & ~3UL; o + 16 <= end; o += 4)
+	{
+		if (*(DWORD *)&m_Buffer[o] != 0xE3100001)                                // tst r0,#1
+			continue;
+		DWORD w1 = *(DWORD *)&m_Buffer[o + 4], w2 = *(DWORD *)&m_Buffer[o + 8], w3 = *(DWORD *)&m_Buffer[o + 12];
+		if ((w1 & 0xFFFFF000) != 0x13A01000 || (w2 & 0xFFFFF000) != 0x13A00000 || (w3 >> 24) != 0x1A && (w3 >> 24) != 0x1B)    // movne r1,#L / movne r0,#N / bne (or blne)
+			continue;
+		DWORD tgt = o + 12 + 8 + (DWORD)(((long)((w3 & 0xFFFFFF) << 8)) >> 6);
+		if (!have)
 		{
-			if (!strncmp(m_pPartitions[i].id, "dpua", 4) && m_PartitionInfo[i].bCanModify)
+			target = tgt;
+			have = TRUE;
+		}
+		else if (tgt != target)
+			continue;
+		pitch.push_back(o + 8);
+		len.push_back(o + 4);
+	}
+	if (pitch.empty() || pitch.size() > 4)
+	{
+		pitch.clear();
+		len.clear();
+		return FALSE;
+	}
+	if (pImm != NULL)
+		*pImm = TRUE;
+	return TRUE;
+}
+
+// The first form: sound_request with a literal length (4G family, 5G, 5.5G).
+BOOL CFirmware::FindClickSitesSR(vector<DWORD> &pitch, vector<DWORD> &len)
+{
+	static const DWORD SIG[14] = { 0xE92D4010, 0xE24DD020, 0xE1A04001, 0xE3A01000, 0xE1A0E00D, 0xE3A02000, 0xE3A03000, 0xE3A0C000, 0, 0xE3A01000, 0xE5CD1010, 0xE28D1014, 0, 0xE3A00F4B };
+	pitch.clear();
+	len.clear();
+	DWORD start, ilen;
+	if (m_Buffer == NULL || !GetImageRange("soso", &start, &ilen))
+		return FALSE;
+	DWORD end = start + ilen;
+	if (end > m_BufferSize)
+		end = m_BufferSize;
+	start &= ~3UL;
+	// sound_request: the words of SIG (0 = any word: the two stm instructions)
+	DWORD sr = 0;
+	for (DWORD o = start; o + 14 * 4 <= end && sr == 0; o += 4)
+	{
+		if (*(DWORD *)&m_Buffer[o] != SIG[0])
+			continue;
+		int k = 1;
+		while (k < 14 && (SIG[k] == 0 || *(DWORD *)&m_Buffer[o + 4 * k] == SIG[k]))
+			k++;
+		if (k == 14)
+			sr = o;
+	}
+	if (sr == 0)
+		return FALSE;
+	for (DWORD o = start + 16; o + 4 <= end; o += 4)
+	{
+		DWORD w = *(DWORD *)&m_Buffer[o];
+		if ((w & 0x0F000000) != 0x0B000000 || (w >> 28) == 0xE || (w >> 28) == 0xF)       // a conditional bl
+			continue;
+		DWORD tgt = o + 8 + (DWORD)(((long)((w & 0xFFFFFF) << 8)) >> 6);
+		if (tgt != sr)
+			continue;
+		DWORD cond = w >> 28;
+		DWORD mov = 0, lit = 0;
+		for (int k = 1; k <= 4; k++)
+		{
+			DWORD y = *(DWORD *)&m_Buffer[o - 4 * k];
+			if ((y >> 28) != cond)
+				continue;
+			if ((y & 0x0FFFFF00) == 0x03A00000 && mov == 0)                           // mov<c> r0,#N (no rotation)
+				mov = o - 4 * k;
+			else if ((y & 0x0F7FF000) == 0x051F1000 || (y & 0x0F7FF000) == 0x059F1000)   // ldr<c> r1,[pc,#X]
 			{
-				if (m_FlashResetPart < 0)               // what it was is kept, for RestoreImageAdresses
-				{
-					m_FlashResetPart = i;
-					m_FlashResetValue = m_pPartitions[i].flash;
-				}
-				m_pPartitions[i].flash=0;
-				break;
+				DWORD d = y & 0xFFF;
+				lit = (y & 0x00800000) ? o - 4 * k + 8 + d : o - 4 * k + 8 - d;
 			}
 		}
-	//}
+		if (mov == 0 || lit == 0 || lit + 4 > m_BufferSize)
+			continue;
+		DWORD v = *(DWORD *)&m_Buffer[lit];
+		if (v == 0 || v > 1000000)
+			continue;
+		pitch.push_back(mov);
+		len.push_back(lit);
+	}
+	return !pitch.empty() && pitch.size() <= 4;
+}
+
+// Invert the screen of the 4G, the minis, the 1G, 2G and 3G. The LCD of these iPods is inverted by bit 1 of its display control register (register 7), and the firmware writes it from the state of the
+// BACKLIGHT (Rockbox: HAVE_BACKLIGHT_INVERSION, the panel looks inverted under the backlight): two conditional instructions, "<eq> r0 = A" (backlight off) and "<ne> r0 = B" (on), A and B differing in bit 1:
+// 4G / mini 1G / 2G: "orreq r0,r0,#1 / orrne r0,r0,#3 / and r4,r0,#0xff" (A = 1, B = 3), once; 1G / 2G / 3G: "moveq r0,#9 / movne r0,#0xb / and r2,r0,#0xff / mov r0,#7" (A = 9, B = 0xB), once or twice (the
+// 3G 2.2.1 and later have the function that sets the state and the one that redraws). Inverted = the two swapped (eq B / ne A): the screen is inverted with the backlight off and on. Writing only one of them
+// (as the first version of this did) changes only one backlight state. The byte that tells the state is the immediate of the first instruction (the other one is changed with it). *pStock = A, *pInverted = B.
+// [the bit inverting the screen was tried on a 4G (poke at run time); the backlight dependence is from Rockbox; none of the patches is tried on an iPod yet]
+BOOL CFirmware::GetLcdInvertSites(vector<DWORD> &sites, BYTE v[4], DWORD *pInitSite, BOOL *pWide, vector<DWORD> *pSkip, vector<DWORD> *pConst)
+{
+	pConst->clear();
+	*pWide = FALSE;
+	pSkip->clear();
+	// v[0] / v[1] = the first / second immediate when the screen is NOT inverted, v[2] / v[3] when it is.
+	*pInitSite = 0;
+	sites.clear();
+	DWORD start, len;
+	if (m_Buffer == NULL || !GetImageRange("soso", &start, &len))
+		return FALSE;
+	DWORD end = start + len;
+	vector<DWORD> a, b, on, guard;
+	for (DWORD o = start & ~3UL; o + 20 <= end; o += 4)
+	{
+		DWORD w1 = *(DWORD *)&m_Buffer[o], w2 = *(DWORD *)&m_Buffer[o + 4], w3 = *(DWORD *)&m_Buffer[o + 8], w4 = *(DWORD *)&m_Buffer[o + 12];
+		// the writes of the register 7 when the display is switched on: "orr r4,r0,#1 / mov r0,#7 / bl lcd_cmd / mov r1,r4" (4G family), as "mov r4,#0x27" once changed
+		// the backlight flag setter of the newer builds: "cmp r1,#0 / ldrbne r1,[r1,#5] / cmpne r1,#0 / strne r0,[r2,#0xc] / bne refresh" does nothing when the byte 5 of the LCD module's table entry is 0 (it is, on the
+		// minis): "movsne r1,#1" in place of the second compare makes it always redraw the register 7, on every change of the backlight
+		if (w1 == 0xE3510000 && w2 == 0x15D11005 && (w3 == 0x13510000 || w3 == 0x13B01001) && w4 == 0x1582000C)
+			guard.push_back(o + 8);
+		if ((w1 == 0xE3804001 || (w1 & 0xFFFFFF00) == 0xE3A04000) && w2 == 0xE3A00007 && (w3 >> 24) == 0xEB && w4 == 0xE1A01004)
+		{
+			on.push_back(o);
+			// the newer builds: "cmp r4,#0 / beq skip / ldrb r0,[r7] / orr r4,r0,#1": the init of the display, called once at boot with r4 = 0, skips the write of the register 7 (the bootloader has lit the
+			// display already): a nop in place of the beq makes it write it (the inverted value) at boot too
+			if (o >= start + 12 && *(DWORD *)&m_Buffer[o - 12] == 0xE3540000 && (*(DWORD *)&m_Buffer[o - 8] == 0x0A000006 || *(DWORD *)&m_Buffer[o - 8] == 0xE1A00000) && (*(DWORD *)&m_Buffer[o - 4] & 0xFFF00FFF) == 0xE5D00000)
+				pSkip->push_back(o - 8);
+		}
+		if (((w1 == 0x03800001 && w2 == 0x13800003) || ((w1 & 0xFFFFFF00) == 0x03A00000 && w2 == (w1 | 0x10000000))) && w3 == 0xE20040FF)       // orreq #1 / orrne #3 (stock), or moveq / movne #0x27 (inverted)
+			a.push_back(o);
+		else if ((((w1 == 0x03A00009 || w1 == 0x03A00027) && (w2 == 0x13A0000B || w2 == 0x13A00019 || w2 == 0x13A00027)) || ((w1 == 0x13A0000B || w1 == 0x13A00019 || w1 == 0x13A00027) && (w2 == 0x03A00009 || w2 == 0x03A00027)))
+			&& w3 == 0xE20020FF && w4 == 0xE3A00007)       // moveq r0,#9 / movne r0,#0xb in either order (the 3G 2.2.0.x have the ne first), "and r2,r0,#0xff / mov r0,#7"; #0x27 / #0x19 once changed
+			b.push_back(o);
+		// the other writes of the register 7 as a constant (1G, 2G and the 3G 2.2.1 and later: after the write of the contrast): "mov r2,#9 / mov r1,#0 / mov r0,#7 / pop {...} / b"
+		if ((w1 == 0xE3A02009 || w1 == 0xE3A02027) && w2 == 0xE3A01000 && w3 == 0xE3A00007 && (w4 & 0xFFFF0000) == 0xE8BD0000 && (*(DWORD *)&m_Buffer[o + 16] >> 24) == 0xEA)
+			pConst->push_back(o);
+	}
+	if (a.size() == 1 && b.empty())
+	{
+		sites = a;
+		for (size_t i = 0; i < on.size() && i < 3; i++)
+			sites.push_back(on[i]);                                          // after the first: the display-on writes ("orr r4,r0,#1" <-> "mov r4,#0x27")
+		if (guard.size() == 1)
+			*pInitSite = guard[0];                                          // (for the 4G family: the guard of the backlight flag setter)
+		*pWide = TRUE;                                                      // the two instructions are replaced as a whole (4 bytes each): "orreq r0,r0,#1 / orrne r0,r0,#3" <-> "moveq r0,#0x27 / movne r0,#0x27"
+		return TRUE;
+	}
+	if (a.empty() && b.size() >= 1 && b.size() <= 2)
+	{
+		sites = b;
+		v[0] = 9; v[1] = 0xB; v[2] = 0x27; v[3] = 0x19;                      // Rockbox: 0x19 / 0x27 are the register 7 values of the panel for normal / inverted
+		// the guard of the backlight flag function: "cmp rA,#0 / ldrbne rB,[rA,#N] / cmpne rB,#0 / popeq or moveq pc,lr" (before the two conditional instructions) leaves the function when the byte N of the
+		// table entry of the LCD module is 0, and then the register 7 is never written when the backlight changes (the 3G 2.2.0.x did not invert): "movsne rB,#1" in place of the cmpne
+		// (only for the builds without the constant writes: the 3G 2.2.0.x / the Stacker prototype; the 2.2.1 and later and the 1G / 2G are left as they were, 2.2.3 inverts on a real 3G)
+		for (size_t k = 0; k < b.size() && *pInitSite == 0 && pConst->empty(); k++)
+		{
+			for (DWORD o = b[k] - 4; o >= b[k] - 64 && o > start; o -= 4)
+			{
+				DWORD g1 = *(DWORD *)&m_Buffer[o], g2 = *(DWORD *)&m_Buffer[o + 4], g3 = *(DWORD *)&m_Buffer[o + 8];
+				DWORD rd = (g1 >> 12) & 15;
+				if ((g1 & 0xFFF00000) == 0x15D00000 && (g2 == (0x13500000 | (rd << 16)) || g2 == (0x13B00001 | (rd << 12))) && (g3 >> 28) == 0)
+				{
+					*pInitSite = o + 4;
+					break;
+				}
+			}
+		}
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// Preferences > Advanced "Reflash firmware when writing to iPod" (and a firmware whose own byte says reflash): the byte becomes 0 for one write (RestoreImageAdresses takes it back) and, for the
+// first software, the table versions are raised so the bootloader runs the updater at all (RaiseUpdaterVersions).
+void CFirmware::ResetImageAdresses()
+{
+	int i = ReflashPartition();
+	if (i < 0 || !m_PartitionInfo[i].bCanModify)
+		return;
+	if (m_FlashResetPart < 0)                       // what it was is kept, for RestoreImageAdresses
+	{
+		m_FlashResetPart = i;
+		m_FlashResetValue = m_pPartitions[i].flash;
+	}
+	m_pPartitions[i].flash = 0;
+	RaiseUpdaterVersions();
+}
+
+// The first software of the 1st and 2nd generation (1.0.0, 1.1.0.2, 1.1.0.4, 1.1.1) has 0 as the version of its images in the table. The bootloader
+// of an iPod only runs the updater image of a firmware when that version is at least the lowest one its hardware accepts (0x112 and 0x121 for the
+// 1st generation hardware, 0x120 and 0x121 for the 2nd; the 3rd generation and later ask for 0x200, which their own firmwares carry), so a reflash
+// of such a firmware was ignored. For the time of a write that reflashes, the version is raised to 0x130 (what 1.1.3 to 1.1.5 carry) for the images
+// that are below it; RestoreImageAdresses puts the values back. Firmwares of the generations that carry real versions are not touched.
+void CFirmware::RaiseUpdaterVersions()
+{
+	if (m_Buffer == NULL || m_VersionRaised)
+		return;
+	WORD fmt = (WORD)m_Buffer[266];
+	if (fmt != 0 && fmt != 2)
+		return;
+	static const DWORD kMinVersion = 0x130;
+	for (int i = 0; i < m_NumPartitions && i < 10; i++)
+	{
+		BOOL oneOfOurs = strncmp(m_pPartitions[i].id, "dpua", 4) == 0 || strncmp(m_pPartitions[i].id, "soso", 4) == 0;
+		if (oneOfOurs && m_PartitionInfo[i].bCanModify && m_pPartitions[i].version < kMinVersion)
+		{
+			m_VersionReset[i] = m_pPartitions[i].version;
+			m_pPartitions[i].version = kMinVersion;
+			m_VersionRaised = TRUE;
+		}
+		else
+			m_VersionReset[i] = 0xFFFFFFFF;
+	}
 }
 
 // The firmware files of Apple have 0 in the flash address of the "dpua" image, so the iPod flashes it at the next start. When no
 // flash is wanted the byte is overwritten with 1 (what a firmware read from an iPod that has flashed has), for one write.
 BOOL CFirmware::ReflashByteSet()
 {
-	for (int i = 0; i < m_NumPartitions; i++)
-		if (!strncmp(m_pPartitions[i].id, "dpua", 4))
-			return m_pPartitions[i].flash != 0;
-	return TRUE;
+	int i = ReflashPartition();
+	return i < 0 ? TRUE : m_pPartitions[i].flash != 0;
 }
 
 BOOL CFirmware::CanFlipReflashByte()
 {
-	for (int i = 0; i < m_NumPartitions; i++)
-		if (!strncmp(m_pPartitions[i].id, "dpua", 4))
-			return m_PartitionInfo[i].bCanModify;
-	return FALSE;
+	int i = ReflashPartition();
+	return i >= 0 && m_PartitionInfo[i].bCanModify;
 }
 
 void CFirmware::FlipReflashByte()
 {
-	for (int i = 0; i < m_NumPartitions; i++)
-	{
-		if (!strncmp(m_pPartitions[i].id, "dpua", 4) && m_PartitionInfo[i].bCanModify)
-		{
-			RestoreImageAdresses();                 // a change made for one write is not part of this
-			m_pPartitions[i].flash = m_pPartitions[i].flash ? 0 : 1;
-			break;
-		}
-	}
+	int i = ReflashPartition();
+	if (i < 0 || !m_PartitionInfo[i].bCanModify)
+		return;
+	RestoreImageAdresses();                         // a change made for one write is not part of this
+	m_pPartitions[i].flash = m_pPartitions[i].flash ? 0 : 1;
 }
 
+// The image offsets of the first software (format 0: 1.0.0, 1.1.0.2, 1.1.0.4) are positions on the disk that count from a firmware partition at
+// byte 2048 (the file offset of an image + 2048), the layout the Mac iPods had. The bootloader follows them as they are, so on an iPod whose
+// firmware partition starts elsewhere (block 63 = byte 32256 after a restore) the table has to move by the difference or the iPod does not
+// boot it (shown on 1.0.0: moving the offset of the "soso" image by 30208 made it start). The firmware that is loaded and saved keeps the
+// 2048 form; only the copy that is written to an iPod is moved, and a firmware that is read from an iPod is moved back.
+// Later software (format 2) carries a second table with offsets that are relative to the partition and needs nothing.
+long CFirmware::DiskOffsetDelta(const BYTE *buf, long partitionStart)
+{
+	if (buf == NULL || buf[0x10A] != 0 || buf[0x10B] != 0 || partitionStart <= 0 || partitionStart == 2048)
+		return 0;
+	return partitionStart - 2048;
+}
+
+BOOL CFirmware::RebaseOffsets(LPBYTE buf, long delta)
+{
+	if (buf == NULL || delta == 0)
+		return FALSE;
+	theApp.CalcPartMapAddr(buf);
+	IPOD_PARTITION_HEADER *p = (IPOD_PARTITION_HEADER *)&buf[theApp.PARTITION_MAP_ADDRESS];
+	int n = 0;
+	DWORD lowest = 0xFFFFFFFF;
+	while (n < 10 && (memcmp(&p[n].type, &ata, 4) == 0 || memcmp(&p[n].type, &nand, 4) == 0))
+	{
+		if (p[n].len != 0 && p[n].devOffset < lowest)
+			lowest = p[n].devOffset;
+		n++;
+	}
+	if (n == 0 || lowest == 0xFFFFFFFF)
+		return FALSE;
+	if (delta < 0 && lowest < (DWORD)(-delta) + 2048)       // not in the moved form (a firmware that was written without the move): left as it is
+		return FALSE;
+	for (int i = 0; i < n; i++)
+		if (p[i].len != 0)
+			p[i].devOffset += delta;
+	return TRUE;
+}
+
+// Preferences > Advanced "Never reflash": the same byte as the Tweaks button, 0 -> 1 for one write. (It does not look at bCanModify: keeping an iPod from flashing is always safe.)
 void CFirmware::PreventReflash()
 {
-	for (int i = 0; i < m_NumPartitions; i++)
+	int i = ReflashPartition();
+	if (i < 0 || m_pPartitions[i].flash != 0)
+		return;
+	if (m_FlashResetPart < 0)
 	{
-		if (!strncmp(m_pPartitions[i].id, "dpua", 4))
-		{
-			if (m_pPartitions[i].flash == 0)
-			{
-				if (m_FlashResetPart < 0)
-				{
-					m_FlashResetPart = i;
-					m_FlashResetValue = 0;
-				}
-				m_pPartitions[i].flash = 1;
-			}
-			break;
-		}
+		m_FlashResetPart = i;
+		m_FlashResetValue = 0;
 	}
+	m_pPartitions[i].flash = 1;
 }
 
 // The iPod flashes a partition again when its flash address is 0. A reset that was made for one write must not stay in the
@@ -297,6 +592,13 @@ void CFirmware::RestoreImageAdresses()
 	if (m_FlashResetPart >= 0 && m_FlashResetPart < m_NumPartitions)
 		m_pPartitions[m_FlashResetPart].flash = m_FlashResetValue;
 	m_FlashResetPart = -1;
+	if (m_VersionRaised)                                      // (the versions raised for the reflash of a first software firmware go back)
+	{
+		for (int i = 0; i < m_NumPartitions && i < 10; i++)
+			if (m_VersionReset[i] != 0xFFFFFFFF)
+				m_pPartitions[i].version = m_VersionReset[i];
+		m_VersionRaised = FALSE;
+	}
 }
 
 BOOL CFirmware::DecryptAUPD(int partition)
@@ -487,6 +789,7 @@ void CFirmware::ScanFirmware(CWnd *pWnd)
 					total+=pRsSection[k].num_items;
 
 				i+=sizeof(RESOURCE_SECTION)*pRsHeader->num_sections+sizeof(RESOURCE)*total; //data begin
+				{ ResBlockInfo rb; rb.offset = rs_offset; rb.dataBegin = i; rb.numSections = pRsHeader->num_sections; m_ResBlocks.push_back(rb); }
 
 				IPOD_LANG *il=new IPOD_LANG;
 				BOOL bString=FALSE;
@@ -948,7 +1251,7 @@ DWORD CFirmware::ComputeChecksum(int index)
 
 	DWORD startAddress = m_PartitionInfo[index].checksumStartAddress;
 
-	blockLen += m_PartitionInfo[index].checksumExtra;
+	blockLen += m_PartitionInfo[index].checksumExtra - m_PartitionInfo[index].checksumTrim;
 
 	for (i = startAddress; i < startAddress + blockLen; i++)
 	{
@@ -1009,6 +1312,148 @@ void CFirmware::RestoreWorkingForm()
 int CFirmware::GetNumPartitions()
 {
 	return m_NumPartitions;
+}
+
+// The element of a layout or menu that holds the byte at pos: its size field and the number of bytes that field says follow (the records of
+// both are size + 4 bytes in every firmware of the collection), found in the lists that were read from the firmware.
+static BOOL FindElementExtent(ViewTable *pViews, MenuTable *pMenus, LPBYTE buf, DWORD pos, DWORD *pStart, DWORD *pLen)
+{
+	if (buf == NULL)
+		return FALSE;
+	if (pViews != NULL)
+		for (size_t j = 0; j < pViews->size(); j++)
+			for (int k = 0; k < pViews->at(j)->num_elems && k < (int)pViews->at(j)->ViewElemList.size(); k++)
+			{
+				const BYTE *e = (const BYTE *)pViews->at(j)->ViewElemList[k]->element;
+				DWORD size = *(const DWORD *)e, start = (DWORD)(e - buf);
+				if (size >= 0x20 && size < 0x1000 && pos >= start && pos - start < size + 4)
+				{
+					*pStart = start;
+					*pLen = size + 4;
+					return TRUE;
+				}
+			}
+	if (pMenus != NULL)
+		for (size_t j = 0; j < pMenus->size(); j++)
+			for (int k = 0; k < pMenus->at(j)->num_elems && k < (int)pMenus->at(j)->MenuElemList.size(); k++)
+			{
+				const BYTE *e = (const BYTE *)pMenus->at(j)->MenuElemList[k]->element;
+				DWORD size = *(const DWORD *)e, start = (DWORD)(e - buf);
+				if (size >= 0x20 && size < 0x1000 && pos >= start && pos - start < size + 4)
+				{
+					*pStart = start;
+					*pLen = size + 4;
+					return TRUE;
+				}
+			}
+	return FALSE;
+}
+
+// The resource that holds the byte at pos, for the hex view: its data as the table of its block gives it (the offset and the
+// size of the entry), or the tables of the block (header, sections, entries) when pos is in them. FALSE when pos is in none.
+BOOL CFirmware::FindResourceExtent(DWORD pos, DWORD *pStart, DWORD *pLen)
+{
+	if (m_Buffer == NULL)
+		return FALSE;
+	if (FindElementExtent(&ViewRecList, &MenuRecList, m_Buffer, pos, pStart, pLen))
+		return TRUE;
+	for (size_t b = 0; b < m_ResBlocks.size(); b++)
+	{
+		const ResBlockInfo &rb = m_ResBlocks[b];
+		if (pos < rb.offset)
+			continue;
+		if (pos < rb.dataBegin)
+		{
+			*pStart = rb.offset;
+			*pLen = rb.dataBegin - rb.offset;
+			return TRUE;
+		}
+		if (rb.offset + sizeof(RESOURCE_HEADER) + sizeof(RESOURCE_SECTION) * rb.numSections > m_BufferSize)
+			continue;
+		RESOURCE_SECTION *pSec = (RESOURCE_SECTION *)&m_Buffer[rb.offset + sizeof(RESOURCE_HEADER)];
+		for (DWORD k = 0; k < rb.numSections; k++)
+		{
+			if ((ULONGLONG)rb.offset + pSec[k].start + (ULONGLONG)sizeof(RESOURCE) * pSec[k].num_items > m_BufferSize)
+				continue;
+			RESOURCE *pRs = (RESOURCE *)&m_Buffer[rb.offset + pSec[k].start];
+			for (DWORD x = 0; x < pSec[k].num_items; x++)
+			{
+				ULONGLONG start = (ULONGLONG)rb.dataBegin + pRs[x].offset;
+				if (pRs[x].size != 0 && pos >= start && pos < start + pRs[x].size)
+				{
+					*pStart = (DWORD)start;
+					*pLen = pRs[x].size;
+					return TRUE;
+				}
+			}
+		}
+	}
+	return FALSE;
+}
+
+BOOL CFirmware::GetImageRange(const char *id, DWORD *pStart, DWORD *pLen)
+{
+	for (int i = 0; i < m_NumPartitions; i++)
+	{
+		if (strncmp(m_pPartitions[i].id, id, 4) != 0 || m_pPartitions[i].len == 0)
+			continue;
+		DWORD start = m_pPartitions[i].devOffset;
+		DWORD len = m_pPartitions[i].len;
+		if (m_Buffer == NULL || start >= m_BufferSize)
+			return FALSE;
+		if (len > m_BufferSize - start)
+			len = m_BufferSize - start;
+		*pStart = start;
+		*pLen = len;
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// The updater image carries the bootloader that is flashed into the iPod, and the bootloader names its build: the text
+// "Bootloader Ui Shell ,Build Apr 19 2003,23:49:56" is in it (1.0.0 has Nov 01 2001, 2.2.0.0 Apr 19 2003, 2.2.3 Feb 16 2005). The image is looked at in
+// the form the program works on (the encrypted ones are decrypted when the firmware is loaded), so nothing is found while the firmware is in the
+// form of the file for a write.
+CString CFirmware::GetBootloaderDate(int index)
+{
+	CString date;
+	if (m_Buffer == NULL || index < 0 || index >= m_NumPartitions || strncmp(m_pPartitions[index].id, "dpua", 4) != 0)
+		return date;
+	static const char key[] = "Bootloader Ui Shell ,Build ";
+	const size_t keyLen = sizeof(key) - 1;
+	DWORD start = m_pPartitions[index].devOffset;
+	if (start >= 2048)
+		start -= 2048;                          // (the first software has the image 2048 bytes in front of its offset)
+	DWORD end = m_pPartitions[index].devOffset + m_pPartitions[index].len + 4096;
+	if (end > m_BufferSize)
+		end = m_BufferSize;
+	for (DWORD i = start; i + keyLen + 11 < end; i++)
+	{
+		if (m_Buffer[i] == 'B' && memcmp(&m_Buffer[i], key, keyLen) == 0)
+		{
+			char s[12];
+			memcpy(s, &m_Buffer[i + keyLen], 11);
+			s[11] = 0;
+			// "Apr 19 2003": a month name, a day, a year
+			if (isalpha((unsigned char)s[0]) && isalpha((unsigned char)s[1]) && isalpha((unsigned char)s[2]) && s[3] == ' ' &&
+			    isdigit((unsigned char)s[7]) && isdigit((unsigned char)s[8]) && isdigit((unsigned char)s[9]) && isdigit((unsigned char)s[10]))
+			{
+				// shown as yy/mm/dd ("Apr 19 2003" -> "03/04/19")
+				static const char months[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
+				int mon = 0;
+				for (int m = 0; m < 12 && !mon; m++)
+					if (_strnicmp(s, &months[m * 3], 3) == 0)
+						mon = m + 1;
+				int day = atoi(&s[4]);
+				if (mon && day >= 1 && day <= 31)
+				{
+					date.Format(_T("%c%c/%02d/%02d"), s[9], s[10], mon, day);
+					break;
+				}
+			}
+		}
+	}
+	return date;
 }
 
 void CFirmware::GetPartitionChecksums(int index, LPDWORD pChecksum1, LPDWORD pChecksum2)

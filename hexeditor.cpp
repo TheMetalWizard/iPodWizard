@@ -25,6 +25,10 @@ CHexWnd::CHexWnd()
 
 	m_RangeStart = 0;
 	m_RangeLen = 0;
+	m_ExtStart = m_ExtLen = m_ExtKey = 0;
+	m_ExtKeyValid = FALSE;
+	m_pExtentFn = NULL;
+	m_pExtentCtx = NULL;
 
 	m_NumLines = 0;
 	m_SbMax = m_SbPage = -1;
@@ -87,7 +91,7 @@ BOOL CHexWnd::RegisterWindowClass()
 // canvas" are both on. Display only; the firmware bytes are never touched.
 struct HexColors
 {
-	COLORREF back, text, gray, highlight, range;
+	COLORREF back, text, gray, highlight, range, extent;
 	HexColors()
 	{
 		if (DarkMode::FontCanvasEnabled())
@@ -111,6 +115,10 @@ struct HexColors
 			range = RGB((GetRValue(highlight) * 40 + GetRValue(back) * 60) / 100,
 			            (GetGValue(highlight) * 40 + GetGValue(back) * 60) / 100,
 			            (GetBValue(highlight) * 40 + GetBValue(back) * 60) / 100);
+	// the whole resource: a grey, light enough for the text and for the other two marks to show
+	extent = RGB((GetRValue(gray) * 22 + GetRValue(back) * 78) / 100,
+	             (GetGValue(gray) * 22 + GetGValue(back) * 78) / 100,
+	             (GetBValue(gray) * 22 + GetBValue(back) * 78) / 100);
 	}
 };
 
@@ -171,6 +179,7 @@ void CHexWnd::OnPaint()
 
 	m_NumLines = clientRect.bottom / m_CharRect.bottom;
 	UpdateScroll();
+	UpdateExtent();
 	
 	while (clientRect.top < clientRect.bottom && !bFinished)
 	{
@@ -197,7 +206,7 @@ void CHexWnd::OnPaint()
 				else
 					pDC->SetTextColor(col.gray);
 
-				COLORREF bkByte = InRange(offset + i) ? col.range : col.back;
+				COLORREF bkByte = InRange(offset + i) ? col.range : (InExtent(offset + i) ? col.extent : col.back);
 				txt.Format(TEXT("%X"), m_Buffer[offset + i] / 0x10);
 				if (m_CursorPos == offset + i && m_CursorHalf == 0 && m_bFocus)
 					pDC->SetBkColor(col.highlight);
@@ -212,7 +221,7 @@ void CHexWnd::OnPaint()
 				DrawText(pDC, txt, &textRect, &cursorRect);
 				txt = " ";
 				// the space between two marked bytes belongs to the mark, so several bytes read as one value
-				pDC->SetBkColor(InRange(offset + i) && InRange(offset + i + 1) ? col.range : col.back);
+				pDC->SetBkColor(InRange(offset + i) && InRange(offset + i + 1) ? col.range : (InExtent(offset + i) && InExtent(offset + i + 1) ? col.extent : col.back));
 				DrawText(pDC, txt, &textRect);
 			}
 		}
@@ -237,7 +246,7 @@ void CHexWnd::OnPaint()
 			if (m_CursorPos == offset + i && m_bFocus)
 				pDC->SetBkColor(col.highlight);
 			else
-				pDC->SetBkColor(InRange(offset + i) ? col.range : col.back);
+				pDC->SetBkColor(InRange(offset + i) ? col.range : (InExtent(offset + i) ? col.extent : col.back));
 
 			DrawText(pDC, txt, &textRect);
 		}
@@ -252,6 +261,29 @@ void CHexWnd::OnPaint()
 	pDC->SelectObject(pOldFont);
 
 	// Do not call CWnd::OnPaint() for painting messages
+}
+
+// The resource behind the marked bytes, or behind the cursor when nothing is marked
+void CHexWnd::UpdateExtent()
+{
+	if (m_pFirmware == NULL)
+	{
+		m_ExtLen = 0;
+		return;
+	}
+	DWORD key = m_RangeLen != 0 ? m_RangeStart : m_CursorPos;
+	if (m_ExtKeyValid && key == m_ExtKey)
+		return;
+	m_ExtKey = key;
+	m_ExtKeyValid = TRUE;
+	DWORD start, len;
+	if ((m_pExtentFn != NULL && m_pExtentFn(m_pExtentCtx, key, &start, &len)) || m_pFirmware->FindResourceExtent(key, &start, &len))
+	{
+		m_ExtStart = start;
+		m_ExtLen = len;
+	}
+	else
+		m_ExtLen = 0;
 }
 
 void CHexWnd::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
@@ -358,6 +390,7 @@ void CHexWnd::SetFirmware(CFirmware *pFirmware)
 	m_BufferLen = pFirmware->GetFirmwareSize();
 	m_Offset = 0;
 	m_RangeLen = 0;
+	m_ExtKeyValid = FALSE;                     // another firmware: the resource is looked up again
 
 	if (IsWindow(m_hWnd))
 	{

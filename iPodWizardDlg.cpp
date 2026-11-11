@@ -186,9 +186,9 @@ class CFirmwarePickDlg : public CDarkDialog
 {
 public:
 	int m_sel;
-	CComboBox* m_pCombo;
-	CFirmwarePickDlg(CComboBox* pCombo, CWnd* pParent)
-		: CDarkDialog(IDD_SELECT_FIRMWARE, pParent), m_sel(-1), m_pCombo(pCombo) {}
+	const CStringArray* m_pItems;
+	CFirmwarePickDlg(const CStringArray* pItems, CWnd* pParent)
+		: CDarkDialog(IDD_SELECT_FIRMWARE, pParent), m_sel(-1), m_pItems(pItems) {}
 protected:
 	CListCtrl m_list;
 	BOOL OnInitDialog() {
@@ -200,8 +200,8 @@ protected:
 		int w = rc.Width() - GetSystemMetrics(SM_CXVSCROLL);
 		m_list.InsertColumn(0, _T("iPod"), LVCFMT_LEFT, w * 6 / 10);
 		m_list.InsertColumn(1, _T("Firmware"), LVCFMT_LEFT, w - w * 6 / 10);
-		for (int i = 0; i < m_pCombo->GetCount(); i++) {
-			CString s; m_pCombo->GetLBText(i, s);
+		for (int i = 0; i < m_pItems->GetCount(); i++) {
+			CString s = m_pItems->GetAt(i);
 			CString name = s, fw;
 			int p = s.ReverseFind(_T('('));
 			if (p >= 0 && s.Right(1) == _T(")")) {
@@ -213,7 +213,7 @@ protected:
 			m_list.InsertItem(i, name);
 			m_list.SetItemText(i, 1, fw);
 		}
-		if (m_pCombo->GetCount() > 0) m_list.SetItemState(0, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
+		if (m_pItems->GetCount() > 0) m_list.SetItemState(0, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
 		return TRUE;
 	}
 	void OnOK() { m_sel = m_list.GetNextItem(-1, LVNI_SELECTED); CDarkDialog::OnOK(); }
@@ -229,6 +229,7 @@ END_MESSAGE_MAP()
 
 CiPodWizardDlg::CiPodWizardDlg(CWnd* pParent /*=NULL*/)
 	: CExDialog(CiPodWizardDlg::IDD, pParent)
+	, m_FirmwareSel(0)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	m_FirmwareFileName.Empty();
@@ -244,7 +245,6 @@ CiPodWizardDlg::CiPodWizardDlg(CWnd* pParent /*=NULL*/)
 void CiPodWizardDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CExDialog::DoDataExchange(pDX);
-	DDX_Control(pDX, IDC_FIRMWARE_COMBO, m_FirmwareCombo);
 	DDX_Control(pDX, IDC_MODE_COMBO, m_EditModeCombo);
 	DDX_Control(pDX, IDC_OPT_TAB, m_OptionsTab);
 	DDX_Control(pDX, IDC_FIRMWARE_LIST, m_FirmwareList);
@@ -323,10 +323,15 @@ BOOL CiPodWizardDlg::OnInitDialog()
 
 	// initialize list
 	m_FirmwareList.SetExtendedStyle(m_FirmwareList.GetExtendedStyle()|LVS_EX_FULLROWSELECT);
-	m_FirmwareList.InsertColumn(0, TEXT("#"), LVCFMT_LEFT, 20);
-	m_FirmwareList.InsertColumn(1, TEXT("Image Checksum"), LVCFMT_LEFT, 95);
-	m_FirmwareList.InsertColumn(2, TEXT("Table Checksum"), LVCFMT_LEFT, 95);
-	m_FirmwareList.InsertColumn(3, TEXT("Status"), LVCFMT_LEFT, 65);
+	m_FirmwareList.InsertColumn(0, TEXT("#"), LVCFMT_LEFT, 18);
+	m_FirmwareList.InsertColumn(1, TEXT("Image Sum"), LVCFMT_LEFT, 70);
+	m_FirmwareList.InsertColumn(2, TEXT("Table Sum"), LVCFMT_LEFT, 70);
+	m_FirmwareList.InsertColumn(3, TEXT("Status"), LVCFMT_LEFT, 50);
+	m_FirmwareList.InsertColumn(4, TEXT("Bootloader"), LVCFMT_LEFT, 58);   // the build date of the bootloader in the updater image
+	m_FwTip.Create(this, TTS_ALWAYSTIP);
+	m_FwTip.SetMaxTipWidth(300);
+	m_FwTip.AddTool(&m_FirmwareList, _T("YY/MM/DD"));
+	m_FwTip.Activate(FALSE);                                                // on only while the pointer is over a date (PreTranslateMessage)
 
 	//Initialize pages
 
@@ -379,13 +384,12 @@ BOOL CiPodWizardDlg::OnInitDialog()
 	CString firmware = pApp->GetProfileString(TEXT("Main"), TEXT("Firmware"));
 	if (!firmware.IsEmpty())
 	{
-		for (int i = 0; i < m_FirmwareCombo.GetCount(); i++)
+		for (int i = 0; i < m_FirmwareLabels.GetCount(); i++)
 		{
-			//m_FirmwareCombo.GetLBText(i, s);
 			s=m_FirmwareNames.GetAt(i);
 			if (s == firmware)
 			{
-				m_FirmwareCombo.SetCurSel(i);
+				m_FirmwareSel = i;
 				break;
 			}
 		}
@@ -452,6 +456,7 @@ refresh:
 	m_minWidth  = rc.Width();
 	m_minHeight = rc.Height();
 	m_Stretch.Init(this);			// the window can be made wider than this; the controls follow
+	FitFirmwareColumns();
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -527,7 +532,7 @@ void CiPodWizardDlg::ThemeChecker()
 			{
 				if (m_FirmwareNames.GetAt(n).Compare(m_ThemeFirmware)==0)
 				{
-					m_FirmwareCombo.SetCurSel(n);
+					m_FirmwareSel = n;
 					UpdateData(FALSE);
 					file.Close();
 					m_bAutoLoadFirmware = TRUE;
@@ -580,6 +585,42 @@ int CiPodWizardDlg::CheckiPod(BOOL bSilent)
 		return -1;
 	}
 	return 0;
+}
+
+// The tip of the bootloader dates: the pointer has to be over the Bootloader column of a row that has a date; the tip gets the message as if
+// the list had got it.
+BOOL CiPodWizardDlg::PreTranslateMessage(MSG *pMsg)
+{
+	if (m_FwTip.GetSafeHwnd() && m_FirmwareList.GetSafeHwnd() && pMsg->message >= WM_MOUSEFIRST && pMsg->message <= WM_MOUSELAST)
+	{
+		POINT pt = { (short)LOWORD(pMsg->lParam), (short)HIWORD(pMsg->lParam) };
+		::MapWindowPoints(pMsg->hwnd, NULL, &pt, 1);                         // screen
+		bool over = false;
+		POINT ptList = pt;
+		if (m_FirmwareList.IsWindowVisible())
+		{
+			::ScreenToClient(m_FirmwareList.m_hWnd, &ptList);
+			CRect rc;
+			m_FirmwareList.GetClientRect(&rc);
+			if (rc.PtInRect(ptList))
+			{
+				LVHITTESTINFO hit;
+				memset(&hit, 0, sizeof(hit));
+				hit.pt = ptList;
+				m_FirmwareList.SubItemHitTest(&hit);
+				over = hit.iItem >= 0 && hit.iSubItem == 4 && !m_FirmwareList.GetItemText(hit.iItem, hit.iSubItem).IsEmpty();
+			}
+		}
+		m_FwTip.Activate(over);
+		if (over)
+		{
+			MSG msg = *pMsg;
+			msg.hwnd = m_FirmwareList.m_hWnd;
+			msg.lParam = MAKELPARAM(ptList.x, ptList.y);
+			m_FwTip.RelayEvent(&msg);
+		}
+	}
+	return CDarkDialog::PreTranslateMessage(pMsg);
 }
 
 void CiPodWizardDlg::OnSysCommand(UINT nID, LPARAM lParam)
@@ -709,6 +750,44 @@ void CiPodWizardDlg::OnSize(UINT nType, int cx, int cy)
 	m_FWExtractorDialog.MoveWindow(clientRect);
 	m_UpdaterDialog.MoveWindow(clientRect);
 	m_PrefsDialog.MoveWindow(clientRect);
+	FitFirmwareColumns();
+}
+
+// The columns of the firmware information: each is at least as wide as its header and its widest text (so no header is cut off) and together they fill the width of the list, at the smallest size of the
+// window and when it is made wider (the extra width is shared by the columns in proportion to their minimum, the "#" column keeps its minimum).
+void CiPodWizardDlg::FitFirmwareColumns()
+{
+	if (!IsWindow(m_FirmwareList.GetSafeHwnd()) || m_FirmwareList.GetHeaderCtrl() == NULL)
+		return;
+	static const LPCTSTR kHeader[5] = { TEXT("#"), TEXT("Image Sum"), TEXT("Table Sum"), TEXT("Status"), TEXT("Bootloader") };
+	static const LPCTSTR kSample[5] = { TEXT("99"), TEXT("0xFFFFFFFF"), TEXT("0xFFFFFFFF"), TEXT("Read-only"), TEXT("YY/MM/DD") };
+	int minW[5], total = 0;
+	for (int c = 0; c < 5; c++)
+	{
+		int h = m_FirmwareList.GetStringWidth(kHeader[c]) + 18;       // (the header has a margin at both ends)
+		int s = m_FirmwareList.GetStringWidth(kSample[c]) + 14;
+		minW[c] = h > s ? h : s;
+		total += minW[c];
+	}
+	CRect rc;
+	m_FirmwareList.GetClientRect(&rc);
+	int width = rc.Width();
+	if (m_FirmwareList.GetStyle() & WS_VSCROLL)
+		width -= GetSystemMetrics(SM_CXVSCROLL);
+	if (width < total)
+		width = total;                                                // (too narrow for all of them: the minimum widths, and the list scrolls)
+	int extra = width - total, spread = total - minW[0], given = 0;
+	for (int c = 0; c < 5; c++)
+	{
+		int w = minW[c];
+		if (c > 0 && spread > 0)
+		{
+			int add = (c == 4) ? extra - given : extra * minW[c] / spread;      // the last column takes what is left, so the sum is exact
+			given += (c == 4) ? 0 : add;
+			w += add;
+		}
+		m_FirmwareList.SetColumnWidth(c, w);
+	}
 }
 
 void CiPodWizardDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
@@ -913,6 +992,58 @@ void CiPodWizardDlg::RefreshiPodDrives()
 	}
 }
 
+// Optional override for an iPod the scan does not recognise (a Mac formatted one, whose firmware partition is not where the scan looks): the registry value
+// Main\ForceDrive (DWORD, the number of the disk: 4 = \\.\PHYSICALDRIVE4) adds that disk to the list. It is only taken when the disk sits on a FireWire or USB
+// bus, so that a typing mistake cannot put an internal disk in the list of places the firmware is written to.
+// (the storage property query is not in the headers of this compiler: the two structures and the code are declared here)
+struct IPW_STORAGE_PROPERTY_QUERY { DWORD PropertyId; DWORD QueryType; BYTE AdditionalParameters[1]; };
+struct IPW_STORAGE_DEVICE_DESCRIPTOR
+{
+	DWORD Version, Size;
+	BYTE DeviceType, DeviceTypeModifier, RemovableMedia, CommandQueueing;
+	DWORD VendorIdOffset, ProductIdOffset, ProductRevisionOffset, SerialNumberOffset;
+	DWORD BusType;
+	DWORD RawPropertiesLength;
+	BYTE RawDeviceProperties[1];
+};
+#define IPW_IOCTL_STORAGE_QUERY_PROPERTY 0x002D1400
+#define IPW_IOCTL_DISK_GET_LENGTH_INFO 0x0007405C
+struct IPW_LENGTH_INFO { LARGE_INTEGER Length; };
+
+static void AddForcedDrive(CString &ipod_list, CStringArray &devices)
+{
+	int n = theApp.GetProfileInt(_T("Main"), _T("ForceDrive"), 0);
+	if (n < 1 || n > 99)
+		return;
+	TCHAR dev[32];
+	wsprintf(dev, TEXT("\\\\.\\PHYSICALDRIVE%d"), n);
+	for (int i = 0; i < devices.GetSize(); i++)
+		if (devices.GetAt(i).CompareNoCase(dev) == 0)
+			return;
+	HANDLE h = CreateFile(dev, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (h == INVALID_HANDLE_VALUE)
+		return;
+	IPW_STORAGE_PROPERTY_QUERY q;
+	memset(&q, 0, sizeof(q));                     // property 0 = the device descriptor, query 0 = the standard one
+	BYTE buf[1024];
+	memset(buf, 0, sizeof(buf));
+	DWORD ret = 0;
+	BOOL ok = DeviceIoControl(h, IPW_IOCTL_STORAGE_QUERY_PROPERTY, &q, sizeof(q), buf, sizeof(buf), &ret, NULL);
+	IPW_LENGTH_INFO len;
+	memset(&len, 0, sizeof(len));
+	BOOL hasMedia = DeviceIoControl(h, IPW_IOCTL_DISK_GET_LENGTH_INFO, NULL, 0, &len, sizeof(len), &ret, NULL) && len.Length.QuadPart > 0;
+	CloseHandle(h);
+	if (!ok || !hasMedia)                         // an empty card reader slot is not an iPod
+		return;
+	DWORD bus = ((IPW_STORAGE_DEVICE_DESCRIPTOR *)buf)->BusType;
+	if (bus != BusTypeUsb && bus != BusType1394)
+		return;
+	CString s;
+	s.Format(TEXT("Disk %d (forced)|"), n);
+	ipod_list.Append(s);
+	devices.Add(dev);
+}
+
 void CiPodWizardDlg::RefreshiPodDrivesImpl()
 {
 	double tPhase = g_scanT0 ? ScanNowMs() : 0;
@@ -1073,7 +1204,12 @@ void CiPodWizardDlg::RefreshiPodDrivesImpl()
 		}
 		if (g_scanT0) { g_scanRawMs = ScanNowMs() - tPhase; tPhase = ScanNowMs(); }
 		if (y==0)
+		{
+			AddForcedDrive(ipod_list, m_iPodDevices);
+			if (ipod_list.Right(1) == TEXT("|"))
+				ipod_list.Truncate(ipod_list.GetLength() - 1);
 			goto ShowStatus;
+		}
 
 		//Get all volumes devicenumber/devicetype in order to compare with our ipod devices.
 		int idx;
@@ -1123,18 +1259,27 @@ void CiPodWizardDlg::RefreshiPodDrivesImpl()
 
 					if (DeviceIoControl(h, IOCTL_STORAGE_GET_DEVICE_NUMBER, NULL, 0, &sdn, sizeof(sdn), &returned, NULL))  
 					{
+						BOOL matched = FALSE;
 						for (idx=0;idx<26;idx++)
 							if (sdn_drives[idx].DeviceNumber == sdn.DeviceNumber && sdn_drives[idx].DeviceType == sdn.DeviceType)
 							{
 								ipod_list.AppendFormat(TEXT("%c:|"), 'A' + idx);
 								m_iPodDevices.Add(devstring2);
+								matched = TRUE;
 								break;
 							}
+						// A Mac formatted iPod has no volume Windows can read, so no drive letter has to point at it: it is listed by its disk number
+						if (!matched)
+						{
+							ipod_list.AppendFormat(TEXT("Disk %d (no drive letter)|"), (int)sdn.DeviceNumber);
+							m_iPodDevices.Add(devstring2);
+						}
 					}
 					CloseHandle(h);
 				}
 				y++;
-			}	
+			}
+		AddForcedDrive(ipod_list, m_iPodDevices);
 	}
 
 	if (ipod_list.Right(1).Compare(TEXT("|"))==0)
@@ -1213,7 +1358,9 @@ ShowStatus:
 			for (WORD i=0;i<ipod_list.GetLength();i++)
 				if (ipod_list.Mid(i,1).Compare(TEXT("|"))==0)
 				{
-					if (GetVolumeInformation(ipod_list.Mid(last, 3), szName, 12, NULL, NULL, NULL, NULL, NULL))
+					if (ipod_list.Mid(last, 4).Compare(TEXT("Disk")) == 0)       // listed by its disk number, no volume to name
+						sDrive = ipod_list.Mid(last, i - last);
+					else if (GetVolumeInformation(ipod_list.Mid(last, 3), szName, 12, NULL, NULL, NULL, NULL, NULL))
 					{
 						sDrive.Format(TEXT("%s"),ipod_list.Mid(last, 3));
 						if (!_tcscmp(szName, TEXT("")))
@@ -1221,10 +1368,14 @@ ShowStatus:
 						else
 							sDrive.AppendFormat(TEXT(" %s"), szName);
 					}
+					else
+						sDrive = ipod_list.Mid(last, i - last);      // Windows can't read the volume (Mac formatted): show the entry as it is
 					m_iPodDriveCombo.AddString(sDrive);
 					last=i+1;
 				}
-			if (GetVolumeInformation(ipod_list.Mid(last, 3), szName, 12, NULL, NULL, NULL, NULL, NULL))
+			if (ipod_list.Mid(last, 4).Compare(TEXT("Disk")) == 0)
+				sDrive = ipod_list.Mid(last);
+			else if (GetVolumeInformation(ipod_list.Mid(last, 3), szName, 12, NULL, NULL, NULL, NULL, NULL))
 			{
 				sDrive.Format(TEXT("%s"),ipod_list.Mid(last, 3));
 				if (!_tcscmp(szName, TEXT("")))
@@ -1232,11 +1383,15 @@ ShowStatus:
 				else
 					sDrive.AppendFormat(TEXT(" %s"), szName);
 			}
+			else
+				sDrive = ipod_list.Mid(last);
 			m_iPodDriveCombo.AddString(sDrive);
 		}
 		else
 		{
-			if (GetVolumeInformation(ipod_list, szName, 12, NULL, NULL, NULL, NULL, NULL))
+			if (ipod_list.Left(4).Compare(TEXT("Disk")) == 0)
+				;                                              // listed by its disk number
+			else if (GetVolumeInformation(ipod_list, szName, 12, NULL, NULL, NULL, NULL, NULL))
 				if (!_tcscmp(szName, TEXT("")))
 					ipod_list.AppendFormat(TEXT(" No Name"));
 				else
@@ -1503,8 +1658,8 @@ void CiPodWizardDlg::OpenUpdater(BOOL firstTime)
 
 	m_UpdaterDialog.GenerateList(&m_RsrcMgr, m_Filename);
 
-	// fill combo
-	m_FirmwareCombo.ResetContent();
+	// the list the Select window shows
+	m_FirmwareLabels.RemoveAll();
 	m_FirmwareNames.RemoveAll();
 	TCHAR szTemp[BUFSIZE];
 
@@ -1517,12 +1672,12 @@ void CiPodWizardDlg::OpenUpdater(BOOL firstTime)
 		{
 			CString s(szTemp);
 			s.AppendFormat(_T(" (v%s)"), m_RsrcMgr.GetResourceName(i).Right(m_RsrcMgr.GetResourceName(i).GetLength() - 13));
-			m_FirmwareCombo.AddString(s);
+			m_FirmwareLabels.Add(s);
 		}
 		else
-			m_FirmwareCombo.AddString(m_RsrcMgr.GetResourceName(i));
+			m_FirmwareLabels.Add(m_RsrcMgr.GetResourceName(i));
 	}
-	m_FirmwareCombo.SetCurSel(0);
+	m_FirmwareSel = 0;
 
 	GetDlgItem(ID_LOAD_FIRMWARE)->EnableWindow(TRUE);
 }
@@ -1606,14 +1761,14 @@ void CiPodWizardDlg::OnBnClickedLoadFirmware()
 
 		if (!m_bAutoLoadFirmware)
 		{
-			CFirmwarePickDlg dlgPick(&m_FirmwareCombo, this);
+			CFirmwarePickDlg dlgPick(&m_FirmwareLabels, this);
 			if (dlgPick.DoModal() != IDOK || dlgPick.m_sel < 0)
 				return;
-			m_FirmwareCombo.SetCurSel(dlgPick.m_sel);
+			m_FirmwareSel = dlgPick.m_sel;
 		}
 
 		//Load the firmware resource into memory
-		name = m_FirmwareNames.GetAt(m_FirmwareCombo.GetCurSel());
+		name = m_FirmwareNames.GetAt(m_FirmwareSel);
 		if (!m_RsrcMgr.LoadResource(FIRMWARE_RESOURCE_TYPE, name))
 		{
 			MessageBox(TEXT("Unable to load resource!"));
@@ -1755,6 +1910,32 @@ private:
 	CiPodWizardDlg *m_pDlg;
 	CFirmware &m_fw;
 	bool m_bOn;
+};
+
+// The firmware as it is written to the iPod: a format 0 firmware (1.0.0 ...) gets the image offsets of the firmware partition where it
+// really starts (see CFirmware::DiskOffsetDelta); every other firmware is written as it is.
+class CDiskImage
+{
+public:
+	CDiskImage(CFirmware &fw) : m_p(NULL), m_buf(fw.GetFirmwareBuffer())
+	{
+		long delta = CFirmware::DiskOffsetDelta(m_buf, theApp.FIRMWARE_START);
+		if (delta != 0)
+		{
+			DWORD size = fw.GetFirmwareSize();
+			m_p = new BYTE[size + 524288];
+			memcpy(m_p, m_buf, size);
+			if (CFirmware::RebaseOffsets(m_p, delta))
+				m_buf = m_p;
+		}
+	}
+	~CDiskImage() { delete[] m_p; }
+	LPBYTE Buffer() const { return m_buf; }
+private:
+	LPBYTE m_p;
+	LPBYTE m_buf;
+	CDiskImage(const CDiskImage &);
+	CDiskImage &operator=(const CDiskImage &);
 };
 
 // What the iPod does with a changed boot picture: its flash is only written again when the firmware says so (the "flash"
@@ -2106,7 +2287,33 @@ void CiPodWizardDlg::OnBnClickedWriteFirmwareButton()
 			if (devInit != -1)
 			{
 				theApp.InitHDDValues(devInit);
+				// Before anything is written: the place has to be the start of a firmware (the same sign the detector looks for), and the firmware has
+				// to fit in the partition when the partition map gives its size
+				BOOL placeOK = FALSE;
+				const int chk = (theApp.BLOCK_SIZE > 0) ? theApp.BLOCK_SIZE : 512;
+				unsigned char *first = new unsigned char[chk];
+				memset(first, 0, chk);
+				if (_lseek(devInit, theApp.FIRMWARE_START, SEEK_SET) != -1 && _read(devInit, first, chk) > 8)
+					for (int j = 0; j + 6 < chk; j++)
+						if (first[j] == 'S' && first[j + 2] == 'T' && first[j + 4] == 'O' && first[j + 6] == 'P')
+						{
+							placeOK = TRUE;
+							break;
+						}
+				delete[] first;
 				_close(devInit);
+				if (!placeOK)
+				{
+					MessageBox(TEXT("The place where the firmware is written to does not hold an iPod firmware. Nothing was written."), TEXT("Write stopped"), MB_OK | MB_ICONERROR);
+					theApp.m_SavingFirmware = FALSE;
+					return;
+				}
+				if (theApp.FIRMWARE_LEN > 0 && m_Firmware.GetFirmwareSize() > (DWORD)theApp.FIRMWARE_LEN)
+				{
+					MessageBox(TEXT("The firmware is larger than the firmware partition of this iPod. Nothing was written."), TEXT("Write stopped"), MB_OK | MB_ICONERROR);
+					theApp.m_SavingFirmware = FALSE;
+					return;
+				}
 			}
 		}
 
@@ -2118,9 +2325,10 @@ void CiPodWizardDlg::OnBnClickedWriteFirmwareButton()
 		}
 
 		DWORD size=m_Firmware.GetFirmwareSize();
-		LPBYTE lpBuf=m_Firmware.GetFirmwareBuffer();
+		CDiskImage diskImage(m_Firmware);
+		LPBYTE lpBuf=diskImage.Buffer();
 		_lseek(dev, theApp.FIRMWARE_START, SEEK_SET);
-		
+
 		CScanDialog dlg;
 		dlg.Create(dlg.IDD, this);
 
@@ -2171,13 +2379,16 @@ void CiPodWizardDlg::OnBnClickedWriteFirmwareButton()
 
 		dlg.m_ProgressCtrl.SetPos(size);
 		dlg.m_ProgressCtrl.UpdateWindow();
+		_commit(dev);
 		_close(dev);
 		dlg.DestroyWindow();
+		if (VerifyBootloader(devstring, lpBuf, size, !m_Firmware.ReflashByteSet()) <= 0)         // only when the written table says reflash (flash byte 0 = the iPod flashes the bootloader on eject): then the bootloader part is read back and compared
+			return;
 
 		theApp.m_SavingFirmware=FALSE;
 		writeForm.Release();
 
-		MessageBox(TEXT("Successfully written to your iPod!\r\n\r\nWarning: According to Apple's EULA, modifying & distributing firmwares is prohibited. Firmwares are without warranty for personal use only."));
+		ShowWriteSuccess();
 	}
 	else if (m_FirmMode==0)
 	{
@@ -2334,6 +2545,7 @@ void CiPodWizardDlg::UpdateChecksums()
 			s = "Read-only";
 		}
 		m_FirmwareList.SetItemText(i, 3, s);
+		m_FirmwareList.SetItemText(i, 4, m_Firmware.GetBootloaderDate(i));
 	}
 }
 
@@ -2459,6 +2671,8 @@ ReadStart:
 
 	theApp.m_LoadingFirmware=TRUE;
 
+	CFirmware::RebaseOffsets(buffer, -CFirmware::DiskOffsetDelta(buffer, theApp.FIRMWARE_START));      // a format 0 firmware is kept in the form of its file
+
 	CString name = _T("iPod Firmware");
 	if (!m_Firmware.SetFirmware(name, buffer, size))
 	{
@@ -2522,7 +2736,6 @@ void CiPodWizardDlg::OnCbnSelchangeModeCombo()
 	{
 	case 0: //ipod
 		GetDlgItem(IDC_WRITE_FIRMWARE_BUTTON)->SetWindowText(_T("Write to iPod"));
-		GetDlgItem(IDC_FIRMWARE_COMBO)->ShowWindow(SW_HIDE);
 		GetDlgItem(ID_LOAD_FIRMWARE)->ShowWindow(SW_HIDE);
 		GetDlgItem(IDC_LOADIPODFW_BUTTON)->ShowWindow(SW_SHOW);
 		GetDlgItem(ID_OPEN_FFILE)->ShowWindow(SW_HIDE);
@@ -2536,7 +2749,6 @@ void CiPodWizardDlg::OnCbnSelchangeModeCombo()
 		GetDlgItem(ID_OPEN_FFILE)->SetWindowTextW(_T("Open File"));
 		GetDlgItem(IDC_LOADIPODFW_BUTTON)->ShowWindow(SW_HIDE);
 		GetDlgItem(ID_OPEN_FFILE)->ShowWindow(SW_SHOW);
-		GetDlgItem(IDC_FIRMWARE_COMBO)->ShowWindow(SW_HIDE);
 		GetDlgItem(ID_LOAD_FIRMWARE)->ShowWindow(SW_HIDE);
 		GetDlgItem(IDC_WRITE_FIRMWARE_BUTTON)->ShowWindow(SW_HIDE);
 		GetDlgItem(IDC_WRITE2IPOD_FIRMWARE_BUTTON)->ShowWindow(SW_SHOW);
@@ -2548,7 +2760,6 @@ void CiPodWizardDlg::OnCbnSelchangeModeCombo()
 		GetDlgItem(ID_OPEN_FFILE)->SetWindowTextW(_T("Open iPSW"));
 		GetDlgItem(IDC_LOADIPODFW_BUTTON)->ShowWindow(SW_HIDE);
 		GetDlgItem(ID_OPEN_FFILE)->ShowWindow(SW_SHOW);
-		GetDlgItem(IDC_FIRMWARE_COMBO)->ShowWindow(SW_HIDE);
 		GetDlgItem(ID_LOAD_FIRMWARE)->ShowWindow(SW_HIDE);
 		GetDlgItem(IDC_WRITE_FIRMWARE_BUTTON)->ShowWindow(SW_HIDE);        // writing into the .ipsw is "Save to ipsw" (a copy), not a Write
 		GetDlgItem(IDC_SAVETOFILE_BUTTON)->ShowWindow(SW_SHOW);
@@ -2560,7 +2771,6 @@ void CiPodWizardDlg::OnCbnSelchangeModeCombo()
 	case 3: //updater
 		GetDlgItem(IDC_WRITE_FIRMWARE_BUTTON)->SetWindowText(_T("&Write"));
 		GetDlgItem(IDC_LOADIPODFW_BUTTON)->ShowWindow(SW_HIDE);
-		GetDlgItem(IDC_FIRMWARE_COMBO)->ShowWindow(SW_HIDE);
 		GetDlgItem(ID_LOAD_FIRMWARE)->ShowWindow(SW_SHOW);
 		GetDlgItem(ID_OPEN_FFILE)->ShowWindow(SW_HIDE);
 		GetDlgItem(IDC_WRITE2IPOD_FIRMWARE_BUTTON)->ShowWindow(SW_HIDE);
@@ -2581,6 +2791,11 @@ void CiPodWizardDlg::OnCbnSelchangeModeCombo()
 }
 
 void CiPodWizardDlg::OnBnClickedEjectButton()
+{
+	EjectIPod(FALSE);
+}
+
+void CiPodWizardDlg::EjectIPod(BOOL bQuiet)
 {
 	if (!m_COMFindiPod)
 	{
@@ -2616,7 +2831,9 @@ void CiPodWizardDlg::OnBnClickedEjectButton()
 		typedef int (WINAPI *FnMsgBoxTimeout)(HWND, LPCWSTR, LPCWSTR, UINT, WORD, DWORD);
 		FnMsgBoxTimeout pMBT = (FnMsgBoxTimeout)GetProcAddress(
 			GetModuleHandle(TEXT("user32.dll")), "MessageBoxTimeoutW");
-		if (pMBT)
+		if (bQuiet)
+			;                                           // automatic eject after a write: the write message tells it
+		else if (pMBT)
 			pMBT(m_hWnd, TEXT("iPod ejected successfully.\n\nThis window will close automatically."), TEXT("iPod Ejected"), MB_OK, 0, 10000);
 		else
 			MessageBox(TEXT("iPod ejected successfully.\n\nThis window will close automatically."));
@@ -2867,9 +3084,10 @@ void CiPodWizardDlg::OnBnClickedWrite2ipodFirmwareButton()
 	theApp.InitHDDValues(dev);
 
 	DWORD size=m_Firmware.GetFirmwareSize();
-	LPBYTE lpBuf=m_Firmware.GetFirmwareBuffer();
+	CDiskImage diskImage(m_Firmware);
+	LPBYTE lpBuf=diskImage.Buffer();
 	_lseek(dev, theApp.FIRMWARE_START, SEEK_SET);
-	
+
 	CScanDialog dlg;
 	dlg.Create(dlg.IDD, this);
 
@@ -2912,14 +3130,228 @@ void CiPodWizardDlg::OnBnClickedWrite2ipodFirmwareButton()
 
 	dlg.m_ProgressCtrl.SetPos(size);
 	dlg.m_ProgressCtrl.UpdateWindow();
+	_commit(dev);
 	_close(dev);
 	dlg.DestroyWindow();
+	if (VerifyBootloader(devstring, lpBuf, size, !m_Firmware.ReflashByteSet()) <= 0)         // only when the written table says reflash (flash byte 0 = the iPod flashes the bootloader on eject): then the bootloader part is read back and compared
+		return;
 
 	theApp.m_SavingFirmware=FALSE;
 	writeForm.Release();
 	GetDlgItem(IDC_WRITE2IPOD_FIRMWARE_BUTTON)->EnableWindow(FALSE);
 
-	MessageBox(TEXT("Successfully written to your iPod!\r\n\r\nWarning: According to Apple's EULA, modifying & distributing firmwares is prohibited. Firmwares are without warranty for personal use only."));
+	ShowWriteSuccess();
+}
+
+// "Bootloader check failed. The iPod was not ejected." with the "failed" in bold and the advice to write a known good firmware before the iPod is
+// ejected by hand. Shown when the read back of the bootloader part after a write (VerifyBootloader) finds a difference or cannot be made.
+static void DrawBootCheckTitle(const DRAWITEMSTRUCT *dis, HWND hDlg)
+{
+	HFONT normal = (HFONT)SendMessage(hDlg, WM_GETFONT, 0, 0);
+	LOGFONT lf;
+	GetObject(normal, sizeof(lf), &lf);
+	lf.lfWeight = FW_BOLD;
+	HFONT bold = CreateFontIndirect(&lf);
+	const TCHAR *a = _T("Bootloader check ");
+	const TCHAR *b = _T("failed");
+	const TCHAR *c = theApp.m_AutoEject ? _T(". The iPod was not ejected.") : _T(".");      // (the iPod is only ejected by itself when "Eject automatically" is on)
+	SIZE sa, sb, sc;
+	HGDIOBJ old = SelectObject(dis->hDC, normal);
+	GetTextExtentPoint32(dis->hDC, a, (int)_tcslen(a), &sa);
+	GetTextExtentPoint32(dis->hDC, c, (int)_tcslen(c), &sc);
+	SelectObject(dis->hDC, bold);
+	GetTextExtentPoint32(dis->hDC, b, (int)_tcslen(b), &sb);
+	int x = dis->rcItem.left + ((dis->rcItem.right - dis->rcItem.left) - (sa.cx + sb.cx + sc.cx)) / 2;
+	int y = dis->rcItem.top + ((dis->rcItem.bottom - dis->rcItem.top) - sa.cy) / 2;
+	FillRect(dis->hDC, &dis->rcItem, GetSysColorBrush(COLOR_BTNFACE));
+	SetBkMode(dis->hDC, TRANSPARENT);
+	SetTextColor(dis->hDC, GetSysColor(COLOR_BTNTEXT));
+	SelectObject(dis->hDC, normal);
+	TextOut(dis->hDC, x, y, a, (int)_tcslen(a));
+	SelectObject(dis->hDC, bold);
+	TextOut(dis->hDC, x + sa.cx, y, b, (int)_tcslen(b));
+	SelectObject(dis->hDC, normal);
+	TextOut(dis->hDC, x + sa.cx + sb.cx, y, c, (int)_tcslen(c));
+	SelectObject(dis->hDC, old);
+	DeleteObject(bold);
+}
+
+// "Bootloader Recovery": what to do after a failed bootloader check (opened by the Help button of the "Bootloader check failed" dialog)
+static INT_PTR CALLBACK BootRecoveryDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM)
+{
+	if (msg == WM_INITDIALOG)
+		return TRUE;
+	if (msg == WM_COMMAND && (LOWORD(wParam) == IDCANCEL || LOWORD(wParam) == IDOK))
+	{
+		EndDialog(hDlg, LOWORD(wParam));
+		return TRUE;
+	}
+	return FALSE;
+}
+
+static INT_PTR CALLBACK BootCheckFailedDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	if (msg == WM_INITDIALOG)
+		return TRUE;
+	if (msg == WM_DRAWITEM && wParam == IDC_BOOTCHECK_TITLE)
+	{
+		DrawBootCheckTitle((const DRAWITEMSTRUCT *)lParam, hDlg);
+		return TRUE;
+	}
+	if (msg == WM_COMMAND && LOWORD(wParam) == IDC_BOOTCHECK_HELP)
+	{
+		DialogBox(AfxGetInstanceHandle(), MAKEINTRESOURCE(IDD_BOOTLOADER_RECOVERY), hDlg, BootRecoveryDlgProc);    // (this window stays open behind it)
+		return TRUE;
+	}
+	if (msg == WM_COMMAND && (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL))
+	{
+		EndDialog(hDlg, LOWORD(wParam));
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// The message after a successful write: "Bootloader check passed." (the "passed" in bold) and, when the iPod is ejected by itself, "The iPod is being ejected." (that box closes by itself after 10 seconds).
+static BOOL g_DoneChecked = FALSE;
+static BOOL g_DoneEject = FALSE;
+
+static void DrawDoneCheck(const DRAWITEMSTRUCT *dis, HWND hDlg)
+{
+	FillRect(dis->hDC, &dis->rcItem, GetSysColorBrush(COLOR_BTNFACE));
+	if (!g_DoneChecked)                                                        // nothing was checked (no reflash, or no bootloader image): nothing is claimed
+	{
+		if (g_DoneEject)
+		{
+			HFONT f = (HFONT)SendMessage(hDlg, WM_GETFONT, 0, 0);
+			HGDIOBJ o = SelectObject(dis->hDC, f);
+			SetBkMode(dis->hDC, TRANSPARENT);
+			SetTextColor(dis->hDC, GetSysColor(COLOR_BTNTEXT));
+			RECT r = dis->rcItem;
+			DrawText(dis->hDC, _T("The iPod is being ejected."), -1, &r, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+			SelectObject(dis->hDC, o);
+		}
+		return;
+	}
+	HFONT normal = (HFONT)SendMessage(hDlg, WM_GETFONT, 0, 0);
+	LOGFONT lf;
+	GetObject(normal, sizeof(lf), &lf);
+	lf.lfWeight = FW_BOLD;
+	HFONT bold = CreateFontIndirect(&lf);
+	const TCHAR *a = _T("Bootloader check ");
+	const TCHAR *b = _T("passed");
+	const TCHAR *c = g_DoneEject ? _T(". The iPod is being ejected.") : _T(".");
+	SIZE sa, sb, sc;
+	HGDIOBJ old = SelectObject(dis->hDC, normal);
+	GetTextExtentPoint32(dis->hDC, a, (int)_tcslen(a), &sa);
+	GetTextExtentPoint32(dis->hDC, c, (int)_tcslen(c), &sc);
+	SelectObject(dis->hDC, bold);
+	GetTextExtentPoint32(dis->hDC, b, (int)_tcslen(b), &sb);
+	int x = dis->rcItem.left;
+	int y = dis->rcItem.top + ((dis->rcItem.bottom - dis->rcItem.top) - sa.cy) / 2;
+	SetBkMode(dis->hDC, TRANSPARENT);
+	SetTextColor(dis->hDC, GetSysColor(COLOR_BTNTEXT));
+	SelectObject(dis->hDC, normal);
+	TextOut(dis->hDC, x, y, a, (int)_tcslen(a));
+	SelectObject(dis->hDC, bold);
+	TextOut(dis->hDC, x + sa.cx, y, b, (int)_tcslen(b));
+	SelectObject(dis->hDC, normal);
+	TextOut(dis->hDC, x + sa.cx + sb.cx, y, c, (int)_tcslen(c));
+	SelectObject(dis->hDC, old);
+	DeleteObject(bold);
+}
+
+static INT_PTR CALLBACK WriteDoneDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	if (msg == WM_INITDIALOG)
+	{
+		if (g_DoneEject)
+			SetTimer(hDlg, 1, 10000, NULL);                                    // the same 10 seconds as the "iPod ejected" message had
+		return TRUE;
+	}
+	if (msg == WM_TIMER && wParam == 1)
+	{
+		KillTimer(hDlg, 1);
+		EndDialog(hDlg, IDOK);
+		return TRUE;
+	}
+	if (msg == WM_DRAWITEM && wParam == IDC_DONE_CHECK)
+	{
+		DrawDoneCheck((const DRAWITEMSTRUCT *)lParam, hDlg);
+		return TRUE;
+	}
+	if (msg == WM_COMMAND && (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL))
+	{
+		KillTimer(hDlg, 1);
+		EndDialog(hDlg, LOWORD(wParam));
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// After a write, the part of the firmware that can brick the iPod is READ BACK and compared with what was written: the header with the table of images and the "dpua" image (bootloader, disk mode,
+// updater). The main firmware is not checked (a bad write there is fixed by writing again, and reading it back would only slow the write down). 1 = the same, 0 = different (the message is shown: the
+// iPod must not be restarted with it), -1 = the iPod could not be read back (a warning is shown; the write itself reported success).
+int CiPodWizardDlg::VerifyBootloader(LPCTSTR devstring, const BYTE *written, DWORD size, BOOL reflash)
+{
+	if (!reflash)                                                 // the bootloader is only written to the flash of the iPod when this write reflashes: no reflash, nothing that can brick it, no check
+	{
+		m_BootCheck = 3;
+		return 1;
+	}
+	DWORD hdrEnd = 0, blStart = 0, blEnd = 0;
+	if (!m_Firmware.GetBootloaderRanges(hdrEnd, blStart, blEnd))
+	{
+		m_BootCheck = 2;
+		return 1;                                                 // no bootloader image in this firmware: nothing to check
+	}
+	m_BootCheck = 0;
+	const DWORD blk = theApp.BLOCK_SIZE > 0 ? (DWORD)theApp.BLOCK_SIZE : 512;
+	CWaitCursor wait;
+	int dev = _wopen(devstring, O_RDONLY | _O_RAW);
+	if (dev == -1)
+	{
+		DialogBox(AfxGetInstanceHandle(), MAKEINTRESOURCE(IDD_BOOT_CHECK_FAILED), m_hWnd, BootCheckFailedDlgProc);
+		return -1;
+	}
+	const DWORD ranges[2][2] = { { 0, hdrEnd }, { blStart, blEnd } };
+	const TCHAR *names[2] = { _T("the header and table of images"), _T("the bootloader image") };
+	int result = 1;
+	for (int r = 0; r < 2 && result == 1; r++)
+	{
+		DWORD a = ranges[r][0], b = ranges[r][1];
+		if (b > size)
+			b = size;
+		if (a >= b)
+			continue;
+		const DWORD a0 = a / blk * blk, b0 = (b + blk - 1) / blk * blk;
+		BYTE *rd = new BYTE[b0 - a0];
+		BOOL got = _lseek(dev, theApp.FIRMWARE_START + (long)a0, SEEK_SET) != -1 && _pdread(dev, rd, b0 - a0, (int)blk) == (int)(b0 - a0);
+		if (!got)
+		{
+			result = -1;
+			DialogBox(AfxGetInstanceHandle(), MAKEINTRESOURCE(IDD_BOOT_CHECK_FAILED), m_hWnd, BootCheckFailedDlgProc);
+		}
+		else if (memcmp(rd + (a - a0), written + a, b - a) != 0)
+		{
+			result = 0;
+			DialogBox(AfxGetInstanceHandle(), MAKEINTRESOURCE(IDD_BOOT_CHECK_FAILED), m_hWnd, BootCheckFailedDlgProc);
+		}
+		delete[] rd;
+	}
+	_close(dev);
+	m_BootCheck = (result == 1) ? 1 : 0;                          // 1: read back and the same (the write message says so, with or without the automatic eject)
+	return result;
+}
+
+// The one message after a successful write to the iPod. The check of the bootloader part (VerifyBootloader) has run before this, whatever the eject setting is, and a check that failed or could not be
+// made never gets here (the write stops with the "Bootloader check failed" dialog and the iPod is not ejected). With "Eject automatically after writing to iPod" the iPod is ejected first.
+void CiPodWizardDlg::ShowWriteSuccess()
+{
+	if (theApp.m_AutoEject)
+		EjectIPod(TRUE);
+	g_DoneChecked = (m_BootCheck == 1);
+	g_DoneEject = theApp.m_AutoEject;
+	DialogBox(AfxGetInstanceHandle(), MAKEINTRESOURCE(IDD_WRITE_DONE), m_hWnd, WriteDoneDlgProc);
 }
 
 void CiPodWizardDlg::OnLvnItemRightClickedFirmwareList(NMHDR *pNMHDR, LRESULT *pResult)

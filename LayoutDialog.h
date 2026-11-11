@@ -91,6 +91,7 @@ protected:
 	DWORD m_ValOffset;
 	int m_ResourceType;
 	CHexWnd m_HexWnd;
+	static BOOL HexExtentHook(void *ctx, DWORD pos, DWORD *pStart, DWORD *pLen);   // the function of the command table that holds pos
 	int m_hexBottom;
 	int m_paneTop;
 	int m_paneHeight;
@@ -168,6 +169,12 @@ protected:
 	void CmdActivateRow(int row, CPoint screenPt);
 	CString CmdRefTip(const PixoScript::Ref &ref);
 	bool CmdChangeValue();
+	void CmdBrickLines(std::vector<PixoScript::Line> &lines);
+	void CmdStackerLines(std::vector<PixoScript::Line> &lines);    // the numbers that decide how Stacker plays      // the numbers that decide how Brick plays, on the commands of the game
+	bool BrickChange();                                            // Change Value on one of them
+	void BrickChanged(DWORD off);                                  // the listing again after a change
+	int  BrickKind(DWORD off, DWORD size) const;                   // which one the marked bytes are (0: none)
+	CString BrickValueText(int kind, DWORD off);
 	void SelectResource(int mode, int id, int row = -1, DWORD hexOff = 0xFFFFFFFF, DWORD hexLen = 0, int col = -1);
 	void GoToMatch(int kind, int id, int item = -1);
 	void GoToRef(const std::vector<PixoScript::Ref> &refs, CPoint screenPt);
@@ -175,6 +182,9 @@ protected:
 	afx_msg void OnNMRClickResourceList(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnNMRClickResourceTree(NMHDR *pNMHDR, LRESULT *pResult);
 	bool MenuChangeCommand();
+	bool MenuRelink(int logicalCol, DWORD offset, int newFn, bool bQuiet);   // store a new command in a menu entry, after comparing it with the old one
+	bool MenuPickCommand(int item, int logicalCol);                          // the list of commands to choose from
+	void UpdateCommandInfo();                                                // the line under the buttons describes the command of the selected cell
 	CString ChangeCueText();                  // the value that Change Value would change, in the form the box takes it
 	void RefreshChangeCue();                  // shown in grey in the box while it is empty
 	afx_msg void OnBnClickedValueKind();
@@ -211,7 +221,7 @@ public:
 	afx_msg void OnBnClickedSaveResourceButton();
 	afx_msg void OnBnClickedLoadChangesButton();
 	afx_msg void OnBnClickedJumpToButton();
-	afx_msg void OnBnClickedSelectorBarButton();
+	void SelectorBarTweak();                                    // "Change Selector Bar Color": the notice + the choice of the iPod (the button is on the Tweaks tab)
 	void ChangeSelectorBar5G();                                 // the two colors of the selection bar: 5G (in the program code) ...
 	void ChangeSelectorBar55G();                                // ... and 5.5G (in the layouts)
 	void FindSelectorSlots(std::vector<DWORD> &slots);               // where the 5.5G keeps the two colors

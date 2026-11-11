@@ -66,6 +66,16 @@ void CLayoutDialog::OnLvnItemClickedResourceList(NMHDR *pNMHDR, LRESULT *pResult
 	m_ClickedCol=(m_ResourceType==1) ? MenuLogicalCol(col) : col;       // for a menu: the field its column shows
 	m_bLinkClick=false;
 
+	// The Summary column (and the "Used by" of menus and font types) only describes the entry: a click in it selects the row and leaves the hex view,
+	// the marked value and the grey where they are. The fields are picked in their own columns.
+	if ((m_ResourceType == 0 && col == 17) || (m_ResourceType == 1 && (col == 15 || col == 16)) || (m_ResourceType == 2 && col == 7))
+	{
+		m_ValSize = 0;                                  // nothing is marked for Change Value
+		RefreshChangeCue();
+		UpdateCommandInfo();
+		return;
+	}
+
 	// a marked part of a cell: the bytes it stands for are shown in the hex view
 	{
 		int hitItem, hitSub, hitLink;
@@ -75,6 +85,7 @@ void CLayoutDialog::OnLvnItemClickedResourceList(NMHDR *pNMHDR, LRESULT *pResult
 			if (pLinks!=NULL && hitLink<(int)pLinks->size())
 			{
 				ShowLink(pLinks->at(hitLink));
+				UpdateCommandInfo();
 				UpdateData(FALSE);
 				return;
 			}
@@ -144,6 +155,7 @@ void CLayoutDialog::OnLvnItemClickedResourceList(NMHDR *pNMHDR, LRESULT *pResult
 		m_HexWnd.SetRange(iOffset, sz);
 	}
 
+	UpdateCommandInfo();
 	UpdateData(FALSE);
 	RefreshChangeCue();
 }

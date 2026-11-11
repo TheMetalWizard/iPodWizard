@@ -2,6 +2,7 @@
 
 #include "stdafx.h"
 #include "PixoScript.h"
+#include "NativeTable.h"
 #include <algorithm>
 
 namespace PixoScript
@@ -97,7 +98,7 @@ static inline DWORD Rd16(const BYTE *p, DWORD off) { return (DWORD)p[off] | ((DW
 static inline DWORD Rd32(const BYTE *p, DWORD off) { return (DWORD)p[off] | ((DWORD)p[off + 1] << 8) | ((DWORD)p[off + 2] << 16) | ((DWORD)p[off + 3] << 24); }
 
 CScript::CScript()
-	: m_bValid(FALSE), m_pRes(NULL), m_dwSize(0), m_dwEntryBase(0), m_dwPoolBase(0), m_dwKeysOffset(0), m_pNames(NULL)
+	: m_bValid(FALSE), m_pRes(NULL), m_dwSize(0), m_dwEntryBase(0), m_dwPoolBase(0), m_dwKeysOffset(0), m_pNames(NULL), m_pNative(NULL)
 {
 	InitOps();
 }
@@ -269,6 +270,14 @@ CString CScript::GetAtomName(int atom) const
 	return CString();
 }
 
+BOOL CScript::IsNativeAtom(int atom) const
+{
+	if (m_pNative == NULL || !m_pNative->IsValid())
+		return FALSE;
+	int lo, hi;
+	return m_pNative->GetParams(atom, &lo, &hi) || m_pNative->FindObject(atom) != NULL;
+}
+
 CString CScript::AtomText(int atom) const
 {
 	CString s = GetAtomName(atom);
@@ -395,6 +404,125 @@ BOOL CScript::Decode(const Function &f, std::vector<Instruction> &out) const
 	return i == n;
 }
 
+// Does the byte code of a function hang together? The stack effect of every instruction is known, so the depth the code needs can be worked
+// out along every path and compared with the depth the function says it needs (they are equal in every function of the 52 firmwares of the
+// collection: 28911 of 28911). Jumps must land on an instruction, arguments and variables must exist, and the depth where two paths meet must
+// be the same. A change made to a number of a command (a call's argument count, a jump, an index) that breaks one of these is found here.
+// Returns TRUE when everything agrees; otherwise *pMsg says what is wrong (only the first problem).
+BOOL CScript::Verify(const Function &f, CString *pMsg) const
+{
+	InitOps();
+	CString dummy;
+	if (pMsg == NULL)
+		pMsg = &dummy;
+	pMsg->Empty();
+	std::vector<Instruction> ins;
+	if (!Decode(f, ins))
+	{
+		*pMsg = _T("The byte code cannot be read: an unknown instruction, or one that runs past the end.");
+		return FALSE;
+	}
+	std::map<int, int> at;                       // offset -> index in ins
+	for (size_t k = 0; k < ins.size(); k++)
+		at[ins[k].off] = (int)k;
+	std::map<int, int> seen;                     // offset -> stack depth when it was reached
+	std::vector<std::pair<int, int> > work;
+	work.push_back(std::make_pair(0, 0));
+	int maxDepth = 0;
+	const int end = (int)f.codeLen;
+	while (!work.empty())
+	{
+		int off = work.back().first, d = work.back().second;
+		work.pop_back();
+		for (;;)
+		{
+			if (off == end)
+				break;                           // the code ends: an implicit return
+			std::map<int, int>::const_iterator it = at.find(off);
+			if (it == at.end())
+			{
+				pMsg->Format(_T("A jump lands at offset %d, which is not the start of an instruction."), off);
+				return FALSE;
+			}
+			std::map<int, int>::const_iterator sn = seen.find(off);
+			if (sn != seen.end())
+			{
+				if (sn->second != d)
+				{
+					pMsg->Format(_T("The stack is %d deep at offset %d on one path and %d on another."), sn->second, off, d);
+					return FALSE;
+				}
+				break;
+			}
+			seen[off] = d;
+			const Instruction &I = ins[it->second];
+			int nd = d;
+			switch (I.op)
+			{
+			case OP_NOP: case OP_GOTO: case OP_NOT: case OP_NEG: case OP_GETPROP: case OP_SETARG: case OP_SETVAR: case OP_CONDSWITCH: break;
+			case OP_PUSH: case OP_NAME: case OP_NUMBER: case OP_ZERO: case OP_ONE: case OP_FALSE: case OP_TRUE: case OP_PUSHOBJ:
+			case OP_GETARG: case OP_GETVAR: case OP_UINT16: case OP_BINDNAME: nd = d + 1; break;
+			case OP_POPV: case OP_RETURN: case OP_POP: case OP_IFEQ: case OP_IFNE: case OP_TABLESWITCH: case OP_DEFAULT: case OP_CASE:
+			case OP_SETNAME: case OP_OR: case OP_AND:
+			case OP_BITAND: case OP_EQ: case OP_NE: case OP_LT: case OP_LE: case OP_GT: case OP_GE:
+			case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: nd = d - 1; break;
+			case OP_CALL: nd = d - (I.arg + 1); break;
+			default:
+				pMsg->Format(_T("The instruction %s at offset %d is not one the check knows."), OpName(I.op), off);
+				return FALSE;
+			}
+			if (I.op == OP_GETARG || I.op == OP_SETARG)
+			{
+				if (I.arg >= f.nParams)
+				{
+					pMsg->Format(_T("The instruction at offset %d uses argument %d, but the command has %d."), off, I.arg, f.nParams);
+					return FALSE;
+				}
+			}
+			if (I.op == OP_GETVAR || I.op == OP_SETVAR)
+			{
+				if (I.arg >= f.nVars)
+				{
+					pMsg->Format(_T("The instruction at offset %d uses variable %d, but the command has %d."), off, I.arg, f.nVars);
+					return FALSE;
+				}
+			}
+			if (nd < 0)
+			{
+				pMsg->Format(_T("The instruction at offset %d takes more from the stack than there is."), off);
+				return FALSE;
+			}
+			if (d > maxDepth) maxDepth = d;
+			if (nd > maxDepth) maxDepth = nd;
+			if (I.op == OP_RETURN)
+				break;
+			if (I.op == OP_GOTO || I.op == OP_IFEQ || I.op == OP_IFNE || I.op == OP_OR || I.op == OP_AND || I.op == OP_CASE || I.op == OP_DEFAULT)
+			{
+				// the path that jumps: goto and or / and keep what is on the stack, the conditions took their value, case took the one it compared
+				int jd = (I.op == OP_IFEQ || I.op == OP_IFNE) ? nd : (I.op == OP_CASE ? nd - 1 : (I.op == OP_DEFAULT ? nd : d));
+				work.push_back(std::make_pair(off + I.arg, jd));
+				if (I.op == OP_GOTO)
+					break;
+			}
+			if (I.op == OP_TABLESWITCH)
+			{
+				for (size_t t = 0; t < I.offs.size(); t++)
+					work.push_back(std::make_pair(off + I.offs[t], nd));
+				work.push_back(std::make_pair(off + I.dflt, nd));
+				break;
+			}
+			d = nd;
+			off += I.len;
+		}
+	}
+	if (maxDepth != f.depth)
+	{
+		pMsg->Format(_T("The code needs a stack %d deep, but the command says %d."), maxDepth, f.depth);
+		return FALSE;
+	}
+	return TRUE;
+}
+
 static CString HexBytes(const BYTE *p, int n)
 {
 	CString s, t;
@@ -435,7 +563,16 @@ BOOL CScript::Disassemble(const Function &f, std::vector<Line> &out) const
 		case OP_INCNAME: case OP_INCPROP: case OP_DECNAME: case OP_DECPROP: case OP_NAMEINC: case OP_PROPINC:
 		case OP_NAMEDEC: case OP_PROPDEC: case OP_SETCONST: case OP_NEW: case OP_STRING:
 			a.Format(_T("%s"), (LPCTSTR)AtomText(I.arg));
-			if (FindFunction(I.arg) >= 0 && (I.op == OP_NAME || I.op == OP_GETPROP))
+			if (FindFunction(I.arg) < 0 && (I.op == OP_NAME || I.op == OP_GETPROP) && IsNativeAtom(I.arg))
+				{
+					Ref r; r.type = REF_NATIVE; r.value = I.arg;
+					r.token = a;
+					r.off = r.insOff = (int)GetCodeOffset(f) + I.off + 1;
+					r.len = 2;
+					r.bigEndian = true;
+					l.refs.push_back(r);
+				}
+				if (FindFunction(I.arg) >= 0 && (I.op == OP_NAME || I.op == OP_GETPROP))
 			{
 				Ref r; r.type = REF_FUNCTION; r.value = I.arg;
 				r.token = a;
@@ -847,6 +984,15 @@ int CDecompiler::Run(int k, int endk, std::vector<Expr> &stack, std::vector<Line
 		case OP_NAME:
 			{
 				Expr e(m_s.AtomText(I.arg), 100);
+					if (m_s.FindFunction(I.arg) < 0 && m_s.IsNativeAtom(I.arg))
+					{
+						Ref r; r.type = REF_NATIVE; r.value = I.arg;
+						r.token = e.t;
+						r.off = r.insOff = m_codeBase + off + 1;
+						r.len = 2;
+						r.bigEndian = true;
+						e.refs.push_back(r);
+					}
 				if (m_s.FindFunction(I.arg) >= 0)
 				{
 					Ref r; r.type = REF_FUNCTION; r.value = I.arg;
@@ -923,6 +1069,15 @@ int CDecompiler::Run(int k, int endk, std::vector<Expr> &stack, std::vector<Line
 				Expr obj = Pop(stack);
 				Expr e(Paren(obj, 100) + _T(".") + m_s.AtomText(I.arg), 100);
 				e.refs = obj.refs;
+				if (m_s.FindFunction(I.arg) < 0 && m_s.IsNativeAtom(I.arg))
+				{
+					Ref r; r.type = REF_NATIVE; r.value = I.arg;
+					r.token = m_s.AtomText(I.arg);
+					r.off = r.insOff = m_codeBase + off + 1;
+					r.len = 2;
+					r.bigEndian = true;
+					e.refs.push_back(r);
+				}
 				if (m_s.FindFunction(I.arg) >= 0)
 				{
 					Ref r; r.type = REF_FUNCTION; r.value = I.arg;

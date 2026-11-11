@@ -34,6 +34,18 @@ public:
 	void ClearRange();
 	DWORD m_RangeStart, m_RangeLen;                     // marked bytes (len 0: none)
 	BOOL InRange(DWORD pos) const { return m_RangeLen != 0 && pos >= m_RangeStart && pos - m_RangeStart < m_RangeLen; }
+	// The whole resource that the marked bytes (or else the cursor) are in, shown in grey behind the other two marks. It is looked up
+	// again when the mark moves or the firmware changes.
+	DWORD m_ExtStart, m_ExtLen, m_ExtKey;                 // the resource (len 0: none), and the position it was looked up for
+	BOOL m_ExtKeyValid;
+	// A tab that knows more than the resource tables (the functions inside the command table) can give the exact extent of the thing that is
+	// selected; it is asked first. Return FALSE when it has nothing for that position.
+	typedef BOOL (*EXTENT_FN)(void *ctx, DWORD pos, DWORD *pStart, DWORD *pLen);
+	EXTENT_FN m_pExtentFn;
+	void *m_pExtentCtx;
+	void SetExtentHook(EXTENT_FN fn, void *ctx) { m_pExtentFn = fn; m_pExtentCtx = ctx; m_ExtKeyValid = FALSE; }
+	void UpdateExtent();
+	BOOL InExtent(DWORD pos) const { return m_ExtLen != 0 && pos >= m_ExtStart && pos - m_ExtStart < m_ExtLen; }
 	int DrawText(CDC *pDC, CString &s, LPRECT lpRect, LPRECT lpCalcRect = NULL);
 	DWORD m_CursorPos;
 	int m_CursorHalf;

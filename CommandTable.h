@@ -11,6 +11,7 @@
 #pragma once
 
 #include "PixoScript.h"
+#include "NativeTable.h"
 #include <map>
 #include <set>
 #include <vector>
@@ -63,7 +64,45 @@ public:
 	CString Role(int functionId) const;                                         // how it is used, empty when it is not
 	CString Label(int functionId) const;                                        // "ID" or "ID - name/role", for the tree
 	CString Signature(int functionId) const;                                    // "a2070(): 0 parameters, 0 variables, 25 bytes"
+	CString Group(int functionId) const;                                        // what kind of job it has ("Opens a screen", "Music and playback", ...)
+	BOOL UsedAs(int functionId, int kind) const;                                // is it run by at least one menu entry in that way (USE_SELECT / USE_HILITE)?
+	CString Describe(int functionId) const;                                     // one line: label, group, parameters
+	// Is `newId` a sensible replacement for `oldId` in a menu entry's highlight (bHilite) or select command? Returns text that tells what was
+	// found (empty when there is nothing to say); *pbWarn is set when something looks wrong.
+	CString Compare(int oldId, int newId, BOOL bHilite, BOOL *pbWarn) const;
 	CString MenuEntryText(int menuId, int item) const;
+
+	// Brick (the BlockO game): where the numbers that decide how it plays are stored in the firmware (offsets in the firmware buffer, 0xFFFFFFFF
+	// when not found). The game is code of the operating system; the monochrome iPods (1G/2G to 4G) have the level table and the start speeds.
+	struct BrickInfo
+	{
+		BOOL valid;
+		DWORD table;                      // 22 levels of {balls, rows of bricks, paddle width} (32 bit words), then {0, 0, 0}
+		DWORD vx, vy;                     // the instructions mov rX,#0x28000 and mov rX,#0x21000: speed of a new ball (16.16 fixed point)
+		DWORD lives;                      // the lowest byte of the instruction mov r0,#3: lives of a new game
+		DWORD score;                      // the lowest byte of the instruction add r1,r0,#1: points for a brick
+		DWORD bonus;                      // the instruction add r0,r0,r1: lives for a cleared level (one per ball still in play)
+		DWORD ballW, ballH, ballGap;      // lowest bytes of mov lr,#3 (width of a ball), add r12,r12,#3 (height), add r12,r3,#4 (start below the bricks)
+	};
+	const BrickInfo &Brick() const { return m_Brick; }
+	static DWORD MovValue(DWORD instruction);                                   // the number a mov rX,#imm instruction loads
+	BOOL IsBrickCommand(int functionId) const;                                  // does it use the BlockO application (gBlockOApp)?
+
+	// Stacker, the falling block game of the 3G prototype 2.2d200 (only that firmware has it). Offsets in the firmware buffer, 0xFFFFFFFF when not found.
+	struct StackerInfo
+	{
+		BOOL valid;
+		DWORD table;                      // 16 shapes of 32 bytes: columns, rows, origin x, origin y (32 bit words), then 4 x 4 cells (bytes)
+		DWORD points;                     // lowest byte of 'add r1,r0,#12': points for a full row
+		DWORD tick[3];                    // lowest bytes of 'mov r1,#40': the length of a tick in ms, in three places that belong together
+		DWORD column[2];                  // lowest bytes of 'mov r0,#6' / 'mov r1,#6': the column a piece appears in
+		DWORD firstPiece;                 // lowest byte of 'mov r1,#4': the shape (type x 4) of the first piece
+	};
+	const StackerInfo &Stacker() const { return m_Stacker; }
+	BOOL IsStackerCommand(int functionId) const;                                // does it use the Stacker application (gStackerApp)?
+	// what the firmware's own tables say about an object or method the script calls (see NativeTable.h), empty when it is neither
+	CString NativeText(int atom) const;
+	const CNativeTable &Natives() const { return m_Native; }
 
 	// Names for atoms (functions, objects, methods). Firmwares only carry them in a development build; the rest
 	// can be given names here: one "atom<TAB>name" per line.
@@ -78,9 +117,17 @@ public:
 	static unsigned int FunctionToRef(int id) { return ((unsigned int)id << 2) | 2; }
 
 private:
+	void FindBrick(const BYTE *img, DWORD len, DWORD bufStart);
+	void FindStacker(const BYTE *img, DWORD len, DWORD bufStart);
+	BOOL UsesApp(int functionId, int resource) const;
 	CFirmware *m_pFw;
 	CLayoutNames *m_pLayoutNames;
 	PixoScript::CScript m_Script;
+	CNativeTable m_Native;
+	BrickInfo m_Brick;
+	StackerInfo m_Stacker;
+	mutable std::map<int, BOOL> m_AppCmd;       // (application resource, command) -> does the command use the application's global
+	mutable std::map<int, int> m_AppGlobal;     // application resource -> atom of the global that holds it (gBlockOApp ...), -1 none
 	DWORD m_dwOffset;
 	BOOL m_bNamesInferred;
 	std::vector<int> m_SortedIds;

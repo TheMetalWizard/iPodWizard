@@ -44,6 +44,7 @@ BEGIN_MESSAGE_MAP(CPrefsDialog, CDarkDialog)
 	ON_BN_CLICKED(IDC_CHK_FORCEREFLASH, &CPrefsDialog::OnBnClickedChkForceReflash)
 	ON_BN_CLICKED(IDC_CHK_NOREFLASH, &CPrefsDialog::OnBnClickedChkNoReflash)
 	ON_BN_CLICKED(IDC_CHK_OLDRESOURCES, &CPrefsDialog::OnBnClickedChkOldResources)
+	ON_BN_CLICKED(IDC_CHK_AUTOEJECT, &CPrefsDialog::OnBnClickedChkAutoEject)
 END_MESSAGE_MAP()
 
 BOOL CPrefsDialog::PreTranslateMessage(MSG *pMsg)
@@ -83,6 +84,12 @@ void CPrefsDialog::OnBnClickedChkOldResources()
 	theApp.WriteProfileInt(_T("Main"), _T("OldResourceSaving"), theApp.m_OldResourceSaving);
 }
 
+void CPrefsDialog::OnBnClickedChkAutoEject()
+{
+	theApp.m_AutoEject = IsDlgButtonChecked(IDC_CHK_AUTOEJECT) ? TRUE : FALSE;
+	theApp.WriteProfileInt(_T("Main"), _T("AutoEject"), theApp.m_AutoEject);
+}
+
 void CPrefsDialog::OnBnClickedChkFontedit()
 {
 	theApp.m_AllowFontEdit = IsDlgButtonChecked(IDC_CHK_FONTEDIT) ? TRUE : FALSE;
@@ -104,6 +111,7 @@ BOOL CPrefsDialog::OnInitDialog()
 	CheckDlgButton(IDC_CHK_FORCEREFLASH, theApp.m_ForceReflash);
 	CheckDlgButton(IDC_CHK_NOREFLASH, theApp.m_NoReflash);
 	CheckDlgButton(IDC_CHK_OLDRESOURCES, theApp.m_OldResourceSaving);
+	CheckDlgButton(IDC_CHK_AUTOEJECT, theApp.m_AutoEject);
 
 	m_Tip.Create(this, TTS_ALWAYSTIP);
 	m_Tip.SetMaxTipWidth(320);

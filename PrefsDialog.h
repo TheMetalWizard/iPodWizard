@@ -35,6 +35,7 @@ public:
 	afx_msg void OnBnClickedChkForceReflash();
 	afx_msg void OnBnClickedChkNoReflash();
 	afx_msg void OnBnClickedChkOldResources();
+	afx_msg void OnBnClickedChkAutoEject();
 	void SetFirmware(CFirmware *pFirmware);
 	afx_msg void OnBnClickedAssociateIpw();
 	afx_msg void OnBnClickedAboutButton();

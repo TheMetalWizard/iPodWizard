@@ -133,7 +133,7 @@
 #define ID_NODEEPSLEEP_CHKBOX           1044
 #define ID_FINDGEN_BUTTON               1044
 #define IDC_LOADCHANGES_BUTTON2         1044
-#define IDC_SELECTORBAR_BUTTON          1044
+#define IDC_SELECTORBAR_BUTTON          1205
 #define IDD_FWEXTRACTOR_DIALOG          148
 #define IDD_SELECT_FIRMWARE             149
 #define IDD_CROSS_IPOD_WARNING          150
@@ -141,6 +141,12 @@
 #define IDD_THEME_HELP                  153
 #define IDD_VOLUME_HACK                 154
 #define IDD_SELECTOR_BAR               156
+#define IDD_BOOT_CHECK_FAILED           157
+#define IDD_WRITE_DONE                  158
+#define IDD_BOOTLOADER_RECOVERY         159
+#define IDD_CLICK_PITCH                 160
+#define IDD_CLICK_FWLIST                161
+#define IDC_CLICKFW_LIST                1218
 #define IDC_FIRMLIST                    1111
 #define IDC_IPODDETECTOR_GROUP          1112
 #define IDC_FIRMINFO_GROUP              1113
@@ -248,6 +254,20 @@
 #define IDC_FONTPREVIEW_BVSCROLL        1156
 #define IDC_CHK_FORCEREFLASH            1157
 #define IDC_CHK_NOREFLASH               1184
+#define IDC_CHK_AUTOEJECT               1202
+#define IDC_BOOTCHECK_TITLE             1203
+#define IDC_DONE_CHECK                  1206
+#define IDC_BOOTCHECK_HELP              1207
+#define IDC_CLICKPITCH_BUTTON           1208
+#define IDC_CLICKPITCH_EDIT             1209
+#define IDC_CLICKPITCH_INFO             1210
+#define IDC_CLICKPITCH_NOTE             1211
+#define IDC_LCDINVERT_BUTTON            1212
+#define IDC_CLICKLEN_EDIT               1213
+#define IDC_CLICKLEN_INFO               1214
+#define IDC_CLICKSTOCK_BUTTON           1215
+#define IDC_CLICKPITCH_LABEL            1216
+#define IDC_CLICKLEN_LABEL              1217
 #define IDC_WRITE_REFLASH_INFO          1185
 #define IDC_FONTPREVIEW_BMETRICS        1158
 #define IDC_FONTPREVIEW_BRULVAL         1159
@@ -328,7 +348,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        157
 #define _APS_NEXT_COMMAND_VALUE         32772
-#define _APS_NEXT_CONTROL_VALUE         1202
+#define _APS_NEXT_CONTROL_VALUE         1219
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

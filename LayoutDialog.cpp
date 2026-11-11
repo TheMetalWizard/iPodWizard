@@ -210,7 +210,6 @@ BEGIN_MESSAGE_MAP(CLayoutDialog, CDarkDialog)
 	ON_NOTIFY(NM_RCLICK, IDC_RESOURCE_TREE, &CLayoutDialog::OnNMRClickResourceTree)
 	ON_BN_CLICKED(IDC_SAVEALLRESOURCES_BUTTON, &CLayoutDialog::OnBnClickedSaveallresourcesButton)
 	ON_BN_CLICKED(IDC_LOADALLRESOURCES_BUTTON, &CLayoutDialog::OnBnClickedLoadallresourcesButton)
-	ON_BN_CLICKED(IDC_SELECTORBAR_BUTTON, &CLayoutDialog::OnBnClickedSelectorBarButton)
 #ifdef IPW_TESTHOOK
 	ON_MESSAGE(WM_USER + 777, OnTestHook)
 #endif
@@ -369,6 +368,7 @@ void CLayoutDialog::SetFirmware(CFirmware *pFirmware)
 	}
 
 	m_HexWnd.SetFirmware(m_pFirmware);
+	m_HexWnd.SetExtentHook(HexExtentHook, this);
 	GetDlgItem(IDC_FIND_EDIT)->EnableWindow(TRUE);
 	GetDlgItem(IDC_CHANGE_EDIT)->EnableWindow(TRUE);
 	//GetDlgItem(IDC_CHKWILD)->EnableWindow(TRUE);
@@ -380,7 +380,6 @@ void CLayoutDialog::SetFirmware(CFirmware *pFirmware)
 	GetDlgItem(IDC_LANGIDX_COMBO)->EnableWindow(TRUE);
 	GetDlgItem(IDC_SAVEALLRESOURCES_BUTTON)->EnableWindow(TRUE);
 	GetDlgItem(IDC_LOADALLRESOURCES_BUTTON)->EnableWindow(TRUE);
-	GetDlgItem(IDC_SELECTORBAR_BUTTON)->EnableWindow(TRUE);
 	UpdateLoadButtons();
 
 	UpdateData(FALSE);
@@ -398,7 +397,6 @@ disable:
 	GetDlgItem(IDC_LANGIDX_COMBO)->EnableWindow(FALSE);
 	GetDlgItem(IDC_SAVEALLRESOURCES_BUTTON)->EnableWindow(FALSE);
 	GetDlgItem(IDC_LOADALLRESOURCES_BUTTON)->EnableWindow(FALSE);
-	GetDlgItem(IDC_SELECTORBAR_BUTTON)->EnableWindow(FALSE);
 
 	UpdateData(FALSE);
 }
@@ -485,7 +483,8 @@ static INT_PTR CALLBACK SelectorBarDlgProc(HWND hDlg, UINT msg, WPARAM wParam, L
 	return FALSE;
 }
 
-void CLayoutDialog::OnBnClickedSelectorBarButton()
+// The button is on the Tweaks tab now (CTweaksDialog::OnBnClickedSelectorBar calls this): the colors are in the layouts / the program code of the loaded firmware, so the routine stays here
+void CLayoutDialog::SelectorBarTweak()
 {
 	INT_PTR which = DialogBox(AfxGetInstanceHandle(), MAKEINTRESOURCE(IDD_SELECTOR_BAR), m_hWnd, SelectorBarDlgProc);
 	if (which == IDC_SELBAR_5G)

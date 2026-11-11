@@ -530,6 +530,7 @@ public:
 	void CalcPartMapAddr(unsigned char *buf);
 	int BLOCK_SIZE;
 	long FIRMWARE_START;
+	long FIRMWARE_LEN;						// size of the firmware partition when the Apple partition map says it (0: not known)
 	long PARTITION_MAP_ADDRESS;
 	BOOL m_BootPicChanged;
 	//Preferences
@@ -541,6 +542,7 @@ public:
 	BOOL m_AllStringsRender;
 	BOOL m_DarkFontCanvas;	// dark mode: also darken the canvas behind the font previews (display only)
 	BOOL m_OldResourceSaving;	// Preferences: Save/Load Resource(s) in the Layout tab work as in iPodWizard 1.3 (legacy themes)
+	BOOL m_AutoEject;		// Preferences: eject the iPod automatically after a successful Write to iPod
 	BOOL m_NoReflash;		// Preferences > Advanced: the reflash byte of the firmware is overwritten when writing to the iPod, it never flashes
 	BOOL m_ForceReflash;		// Preferences > Advanced: every write to the iPod makes it flash the firmware again
 	BOOL m_AllowFontEdit;	// Preferences > Advanced: allow editing the style and size of a font

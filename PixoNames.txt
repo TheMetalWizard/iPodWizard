@@ -1,5 +1,7 @@
-# iPodWizard: names of the functions, objects and methods in the command table.
-# They are inferred from a collection of 38 firmwares and may not be 100% accurate.
+# iPodWizard: names of the functions, objects and methods in the command table (the compiled user interface script).
+# They are carried over from the one firmware that has them, the development build of the nano (14.5.2), by lining the
+# code up. They are inferred, not authoritative. One section per firmware (CRC-32 of the IDs and code lengths of its functions),
+# then one line per atom: number, TAB, name.
 [9869645B]
 # 11_2g_Firmware-1.1.0.2.bin.zip
 6	undefined
@@ -58,6 +60,9 @@
 85	StartCommandTimer
 86	StopCommandTimer
 87	CommandTimerIsActive
+88	RegisterLocalKey
+89	RegisterGlobalKey
+90	EndKeyRegistry
 91	RegisterKeyHandler
 92	ClearKeyHandler
 93	SaveKeyHandler
@@ -94,6 +99,7 @@
 127	HideView
 128	TargetView
 129	GotoView
+130	StartFlashingView
 131	StopFlashingView
 135	TargetViewByID
 136	GotoViewByID
@@ -119,6 +125,7 @@
 159	Type
 160	EnableMenuShortcuts
 164	WheelValue
+174	GetMP3PlayerExampleModel
 175	Shutdown
 176	UpdateBacklightMode
 177	HandleBacklightEvent
@@ -126,10 +133,13 @@
 186	HandlePowerDisconnected
 187	RegisterTickleHandler
 188	ClearTickleHandler
+189	GetMP3PlayerExampleApp
 191	SelectMasterSongList
 192	SelectAllArtistsList
 193	SelectPlayList
+194	SelectArtistList
 195	SelectComposerList
+196	QueueSong
 197	UpdateSort
 198	UpdateArtistList
 200	UpdateSongList
@@ -152,7 +162,10 @@
 224	SetSleepState
 225	TurnScreenOnOff
 227	IsMenuKeyPressed
+230	GetFirstBootState
 231	ClearFirstBootState
+232	GetKeypadLockState
+234	GetPowerConnectedState
 238	SetSetting
 239	GetSetting
 240	LoadNVRAMSettings
@@ -386,6 +399,9 @@
 85	StartCommandTimer
 86	StopCommandTimer
 87	CommandTimerIsActive
+88	RegisterLocalKey
+89	RegisterGlobalKey
+90	EndKeyRegistry
 91	RegisterKeyHandler
 92	ClearKeyHandler
 93	SaveKeyHandler
@@ -422,6 +438,7 @@
 127	HideView
 128	TargetView
 129	GotoView
+130	StartFlashingView
 131	StopFlashingView
 135	TargetViewByID
 136	GotoViewByID
@@ -447,6 +464,7 @@
 159	Type
 160	EnableMenuShortcuts
 164	WheelValue
+174	GetMP3PlayerExampleModel
 175	Shutdown
 176	UpdateBacklightMode
 177	HandleBacklightEvent
@@ -454,10 +472,13 @@
 186	HandlePowerDisconnected
 187	RegisterTickleHandler
 188	ClearTickleHandler
+189	GetMP3PlayerExampleApp
 191	SelectMasterSongList
 192	SelectAllArtistsList
 193	SelectPlayList
+194	SelectArtistList
 195	SelectComposerList
+196	QueueSong
 197	UpdateSort
 198	UpdateArtistList
 200	UpdateSongList
@@ -480,7 +501,10 @@
 224	SetSleepState
 225	TurnScreenOnOff
 227	IsMenuKeyPressed
+230	GetFirstBootState
 231	ClearFirstBootState
+232	GetKeypadLockState
+234	GetPowerConnectedState
 238	SetSetting
 239	GetSetting
 240	LoadNVRAMSettings
@@ -714,6 +738,9 @@
 86	StartCommandTimer
 87	StopCommandTimer
 88	CommandTimerIsActive
+89	RegisterLocalKey
+90	RegisterGlobalKey
+91	EndKeyRegistry
 92	RegisterKeyHandler
 93	ClearKeyHandler
 94	SaveKeyHandler
@@ -750,6 +777,7 @@
 128	HideView
 129	TargetView
 130	GotoView
+131	StartFlashingView
 132	StopFlashingView
 136	TargetViewByID
 137	GotoViewByID
@@ -775,6 +803,7 @@
 160	Type
 161	EnableMenuShortcuts
 165	WheelValue
+175	GetMP3PlayerExampleModel
 176	Shutdown
 177	UpdateBacklightMode
 178	HandleBacklightEvent
@@ -782,10 +811,13 @@
 188	HandlePowerDisconnected
 189	RegisterTickleHandler
 190	ClearTickleHandler
+191	GetMP3PlayerExampleApp
 193	SelectMasterSongList
 194	SelectAllArtistsList
 195	SelectPlayList
+196	SelectArtistList
 197	SelectComposerList
+198	QueueSong
 199	UpdateSort
 200	UpdateArtistList
 202	UpdateSongList
@@ -810,7 +842,10 @@
 229	SetSleepState
 230	TurnScreenOnOff
 234	IsMenuKeyPressed
+237	GetFirstBootState
 238	ClearFirstBootState
+239	GetKeypadLockState
+241	GetPowerConnectedState
 247	SetSetting
 248	GetSetting
 249	LoadNVRAMSettings
@@ -1127,6 +1162,9 @@
 88	StartCommandTimer
 89	StopCommandTimer
 90	CommandTimerIsActive
+91	RegisterLocalKey
+92	RegisterGlobalKey
+93	EndKeyRegistry
 94	RegisterKeyHandler
 95	ClearKeyHandler
 96	SaveKeyHandler
@@ -1163,6 +1201,7 @@
 130	HideView
 131	TargetView
 132	GotoView
+133	StartFlashingView
 134	StopFlashingView
 138	TargetViewByID
 139	GotoViewByID
@@ -1192,6 +1231,7 @@
 170	WheelValue
 171	WheelEventInterval
 181	GetSelectedCalendarDate
+182	GetMP3PlayerExampleModel
 183	Shutdown
 184	UpdateBacklightMode
 185	HandleBacklightEvent
@@ -1205,6 +1245,7 @@
 197	HandlePowerDisconnected
 198	RegisterTickleHandler
 199	ClearTickleHandler
+200	GetMP3PlayerExampleApp
 201	LoadPresetsForNewLanguage
 202	SelectLibrary
 203	SelectMasterSongList
@@ -1213,6 +1254,7 @@
 208	SelectComposerList
 209	SelectArtistList
 210	SelectAlbumList
+211	QueueSong
 212	UpdateSort
 213	UpdateArtistList
 214	UpdateComposerList
@@ -1241,7 +1283,10 @@
 239	SetSleepState
 240	TurnScreenOnOff
 244	IsMenuKeyPressed
+247	GetFirstBootState
 248	ClearFirstBootState
+249	GetKeypadLockState
+251	GetPowerConnectedState
 255	SetSetting
 256	GetSetting
 257	LoadNVRAMSettings
@@ -1276,6 +1321,8 @@
 292	RefreshCalendarMonth
 294	SelectCalendarItem
 295	ChangeCalendarItem
+296	GetCalendarCount
+297	SelectCalendar
 298	HasMoreAlarms
 300	PrepareAlarmDisplay
 301	HandleAlarms
@@ -1660,6 +1707,9 @@
 88	StartCommandTimer
 89	StopCommandTimer
 90	CommandTimerIsActive
+91	RegisterLocalKey
+92	RegisterGlobalKey
+93	EndKeyRegistry
 94	RegisterKeyHandler
 95	ClearKeyHandler
 96	SaveKeyHandler
@@ -1696,6 +1746,7 @@
 130	HideView
 131	TargetView
 132	GotoView
+133	StartFlashingView
 134	StopFlashingView
 138	TargetViewByID
 139	GotoViewByID
@@ -1725,6 +1776,7 @@
 170	WheelValue
 171	WheelEventInterval
 181	GetSelectedCalendarDate
+182	GetMP3PlayerExampleModel
 183	Shutdown
 185	UpdateBacklightMode
 186	HandleBacklightEvent
@@ -1738,6 +1790,7 @@
 198	HandlePowerDisconnected
 199	RegisterTickleHandler
 200	ClearTickleHandler
+201	GetMP3PlayerExampleApp
 202	LoadPresetsForNewLanguage
 203	SelectLibrary
 204	SelectMasterSongList
@@ -1746,6 +1799,7 @@
 209	SelectComposerList
 210	SelectArtistList
 211	SelectAlbumList
+212	QueueSong
 213	UpdateSort
 214	UpdateArtistList
 215	UpdateComposerList
@@ -1774,7 +1828,10 @@
 240	SetSleepState
 241	TurnScreenOnOff
 245	IsMenuKeyPressed
+248	GetFirstBootState
 249	ClearFirstBootState
+250	GetKeypadLockState
+252	GetPowerConnectedState
 256	SetSetting
 257	GetSetting
 258	LoadNVRAMSettings
@@ -1809,6 +1866,8 @@
 293	RefreshCalendarMonth
 295	SelectCalendarItem
 296	ChangeCalendarItem
+297	GetCalendarCount
+298	SelectCalendar
 299	HasMoreAlarms
 301	PrepareAlarmDisplay
 302	HandleAlarms
@@ -2193,6 +2252,9 @@
 88	StartCommandTimer
 89	StopCommandTimer
 90	CommandTimerIsActive
+91	RegisterLocalKey
+92	RegisterGlobalKey
+93	EndKeyRegistry
 94	RegisterKeyHandler
 95	ClearKeyHandler
 96	SaveKeyHandler
@@ -2229,6 +2291,7 @@
 130	HideView
 131	TargetView
 132	GotoView
+133	StartFlashingView
 134	StopFlashingView
 138	TargetViewByID
 139	GotoViewByID
@@ -2258,6 +2321,7 @@
 170	WheelValue
 171	WheelEventInterval
 181	GetSelectedCalendarDate
+182	GetMP3PlayerExampleModel
 183	Shutdown
 186	HandleBacklightEvent
 191	SleepRequest
@@ -2270,6 +2334,7 @@
 198	HandlePowerDisconnected
 199	RegisterTickleHandler
 200	ClearTickleHandler
+201	GetMP3PlayerExampleApp
 202	LoadPresetsForNewLanguage
 203	SelectLibrary
 204	SelectMasterSongList
@@ -2277,8 +2342,10 @@
 207	SelectPlayList
 209	SelectArtistList
 210	SelectAlbumList
+211	SelectGenreList
 212	SelectSong
 214	UpdateSort
+215	UpdateArtistList
 217	UpdateAlbumList
 218	UpdateGenreList
 219	UpdateComposerList
@@ -2305,7 +2372,10 @@
 242	SetSleepState
 243	TurnScreenOnOff
 247	IsMenuKeyPressed
+250	GetFirstBootState
 251	ClearFirstBootState
+252	GetKeypadLockState
+254	GetPowerConnectedState
 257	SetShuffleFilterSpokenWord
 258	ClearShuffleFilterSpokenWord
 260	SetSetting
@@ -2345,6 +2415,7 @@
 301	SelectCalendarItem
 302	ChangeCalendarItem
 303	GetCalendarCount
+304	SelectCalendar
 305	HasMoreAlarms
 307	PrepareAlarmDisplay
 308	HandleAlarms
@@ -2762,6 +2833,9 @@
 108	StartCommandTimer
 109	StopCommandTimer
 110	CommandTimerIsActive
+111	RegisterLocalKey
+112	RegisterGlobalKey
+113	EndKeyRegistry
 114	RegisterKeyHandler
 115	ClearKeyHandler
 116	SaveKeyHandler
@@ -2839,6 +2913,7 @@
 199	WheelValue
 200	WheelEventInterval
 210	GetSelectedCalendarDate
+212	GetMP3PlayerExampleModel
 213	Shutdown
 214	UpdateBacklightMode
 215	TickleBacklight
@@ -2863,6 +2938,8 @@
 234	ClearPodcastDescriptionTimerHandler
 235	EnableRemoteCmds
 236	DisableRemoteCmds
+237	GetMP3PlayerExampleApp
+238	LoadPresetsForNewLanguage
 239	SelectLibrary
 240	SelectMasterSongList
 241	SelectAllPlayLists
@@ -2947,9 +3024,12 @@
 320	GetDiskAcquired
 321	HasFreeSpaceOnDataVolume
 322	IsMenuKeyPressed
+325	GetFirstBootState
 326	ClearFirstBootState
+327	GetKeypadLockState
 328	CanRecordVoiceMemo
 329	UpdateMicrophoneState
+332	GetPowerConnectedState
 334	SetShuffleFilterSpokenWord
 335	ClearShuffleFilterSpokenWord
 336	AdjustBookSpeed
@@ -3082,8 +3162,17 @@
 480	SetImportState
 484	AbortImportForLowPower
 489	GetCurrentRemoteUIApp
+492	GetWorldClockItemCount
+493	CreateNewWorldClock
 495	PrepareAlarmClockTime
+496	AcceptAlarmClockTime
 497	EnableAlarmClockAlarm
+507	GetRegionIndex
+508	SetRegionIndex
+509	SetCityIndex
+510	SelectWorldClock
+511	GetCityIndex
+512	UpdateWorldClock
 515	ResumeGame
 516	ExitGame
 517	EnoughSongsToPlay
@@ -3104,6 +3193,7 @@
 532	GetTimerSettingIndex
 533	GetTransitionSetting
 534	GetTVOutSetting
+536	SetDisplayMode
 537	GetSlideShowApp
 538	FirstScreen
 539	LastScreen
@@ -3113,6 +3203,7 @@
 543	HandlePlayPause
 544	SelectAlbum
 545	CleanupView
+549	GetFirstItemOffset
 550	EnterApplication
 551	ExitApplication
 552	IdleCache
@@ -4053,6 +4144,9 @@
 110	StartCommandTimer
 111	StopCommandTimer
 112	CommandTimerIsActive
+113	RegisterLocalKey
+114	RegisterGlobalKey
+115	EndKeyRegistry
 116	RegisterKeyHandler
 117	ClearKeyHandler
 118	SaveKeyHandler
@@ -4131,6 +4225,7 @@
 201	WheelValue
 202	WheelEventInterval
 212	GetSelectedCalendarDate
+214	GetMP3PlayerExampleModel
 215	Shutdown
 216	UpdateBacklightMode
 217	TickleBacklight
@@ -4155,6 +4250,8 @@
 236	ClearPodcastDescriptionTimerHandler
 237	EnableRemoteCmds
 238	DisableRemoteCmds
+239	GetMP3PlayerExampleApp
+240	LoadPresetsForNewLanguage
 241	SelectLibrary
 242	SelectMasterSongList
 243	SelectAllPlayLists
@@ -4381,8 +4478,17 @@
 485	SetImportState
 489	AbortImportForLowPower
 494	GetCurrentRemoteUIApp
+497	GetWorldClockItemCount
+498	CreateNewWorldClock
 500	PrepareAlarmClockTime
+501	AcceptAlarmClockTime
 502	EnableAlarmClockAlarm
+512	GetRegionIndex
+513	SetRegionIndex
+514	SetCityIndex
+515	SelectWorldClock
+516	GetCityIndex
+517	UpdateWorldClock
 520	ResumeGame
 521	ExitGame
 522	EnoughSongsToPlay
@@ -4406,6 +4512,7 @@
 540	GetTimerSettingIndex
 541	GetTransitionSetting
 542	GetTVOutSetting
+544	SetDisplayMode
 545	GetSlideShowApp
 546	FirstScreen
 547	LastScreen
@@ -4415,6 +4522,7 @@
 551	HandlePlayPause
 552	SelectAlbum
 553	CleanupView
+557	GetFirstItemOffset
 558	EnterApplication
 559	ExitApplication
 560	IdleCache
@@ -5406,6 +5514,9 @@
 110	StartCommandTimer
 111	StopCommandTimer
 112	CommandTimerIsActive
+113	RegisterLocalKey
+114	RegisterGlobalKey
+115	EndKeyRegistry
 116	RegisterKeyHandler
 117	ClearKeyHandler
 118	SaveKeyHandler
@@ -5484,6 +5595,7 @@
 201	WheelValue
 202	WheelEventInterval
 212	GetSelectedCalendarDate
+214	GetMP3PlayerExampleModel
 215	Shutdown
 216	UpdateBacklightMode
 217	TickleBacklight
@@ -5508,6 +5620,8 @@
 236	ClearPodcastDescriptionTimerHandler
 237	EnableRemoteCmds
 238	DisableRemoteCmds
+239	GetMP3PlayerExampleApp
+240	LoadPresetsForNewLanguage
 241	SelectLibrary
 242	SelectMasterSongList
 243	SelectAllPlayLists
@@ -5642,6 +5756,7 @@
 377	SetContrastLevelSetting
 378	GetVolumeSetting
 379	SetVolumeSetting
+380	GetVolumeLimitSetting
 382	GetEqualizerSetting
 383	SetEqualizerSetting
 384	GetClockAlarmSetting
@@ -5747,8 +5862,18 @@
 500	SetImportState
 504	AbortImportForLowPower
 509	GetCurrentRemoteUIApp
+512	GetWorldClockItemCount
+513	CreateNewWorldClock
+514	DeleteSelectedClock
 515	PrepareAlarmClockTime
+516	AcceptAlarmClockTime
 517	EnableAlarmClockAlarm
+527	GetRegionIndex
+528	SetRegionIndex
+529	SetCityIndex
+530	SelectWorldClock
+531	GetCityIndex
+532	UpdateWorldClock
 535	ResumeGame
 536	ExitGame
 537	EnoughSongsToPlay
@@ -5772,6 +5897,7 @@
 555	GetTimerSettingIndex
 556	GetTransitionSetting
 557	GetTVOutSetting
+559	SetDisplayMode
 560	GetSlideShowApp
 561	FirstScreen
 562	LastScreen
@@ -5781,6 +5907,7 @@
 566	HandlePlayPause
 567	SelectAlbum
 568	CleanupView
+572	GetFirstItemOffset
 573	EnterApplication
 574	ExitApplication
 575	IdleCache
@@ -6803,6 +6930,9 @@
 110	StartCommandTimer
 111	StopCommandTimer
 112	CommandTimerIsActive
+113	RegisterLocalKey
+114	RegisterGlobalKey
+115	EndKeyRegistry
 116	RegisterKeyHandler
 117	ClearKeyHandler
 118	SaveKeyHandler
@@ -6881,6 +7011,7 @@
 201	WheelValue
 202	WheelEventInterval
 212	GetSelectedCalendarDate
+214	GetMP3PlayerExampleModel
 215	Shutdown
 216	UpdateBacklightMode
 217	TickleBacklight
@@ -6905,6 +7036,8 @@
 236	ClearPodcastDescriptionTimerHandler
 237	EnableRemoteCmds
 238	DisableRemoteCmds
+239	GetMP3PlayerExampleApp
+240	LoadPresetsForNewLanguage
 241	SelectLibrary
 242	SelectMasterSongList
 243	SelectAllPlayLists
@@ -7040,6 +7173,7 @@
 377	SetContrastLevelSetting
 378	GetVolumeSetting
 379	SetVolumeSetting
+380	GetVolumeLimitSetting
 382	GetEqualizerSetting
 383	SetEqualizerSetting
 384	GetClockAlarmSetting
@@ -7144,8 +7278,18 @@
 500	SetImportState
 504	AbortImportForLowPower
 509	GetCurrentRemoteUIApp
+512	GetWorldClockItemCount
+513	CreateNewWorldClock
+514	DeleteSelectedClock
 515	PrepareAlarmClockTime
+516	AcceptAlarmClockTime
 517	EnableAlarmClockAlarm
+527	GetRegionIndex
+528	SetRegionIndex
+529	SetCityIndex
+530	SelectWorldClock
+531	GetCityIndex
+532	UpdateWorldClock
 535	ResumeGame
 536	ExitGame
 537	EnoughSongsToPlay
@@ -7169,6 +7313,7 @@
 555	GetTimerSettingIndex
 556	GetTransitionSetting
 557	GetTVOutSetting
+559	SetDisplayMode
 560	GetSlideShowApp
 561	FirstScreen
 562	LastScreen
@@ -7178,6 +7323,7 @@
 566	HandlePlayPause
 567	SelectAlbum
 568	CleanupView
+572	GetFirstItemOffset
 573	EnterApplication
 574	ExitApplication
 575	IdleCache
@@ -8279,6 +8425,7 @@
 190	WheelValue
 191	WheelEventInterval
 200	GetSelectedCalendarDate
+202	GetMP3PlayerExampleModel
 203	Shutdown
 204	UpdateBacklightMode
 205	TickleBacklight
@@ -8303,6 +8450,8 @@
 224	ClearPodcastDescriptionTimerHandler
 225	EnableRemoteCmds
 226	DisableRemoteCmds
+227	GetMP3PlayerExampleApp
+228	LoadPresetsForNewLanguage
 229	SelectLibrary
 230	SelectMasterSongList
 231	SelectAllPlayLists
@@ -8382,7 +8531,10 @@
 305	GetDiskAcquired
 306	HasFreeSpaceOnDataVolume
 307	IsMenuKeyPressed
+310	GetFirstBootState
 311	ClearFirstBootState
+312	GetKeypadLockState
+317	GetPowerConnectedState
 319	SetShuffleFilterSpokenWord
 320	ClearShuffleFilterSpokenWord
 321	AdjustBookSpeed
@@ -8480,9 +8632,17 @@
 419	AreNotesLoading
 420	GetCurrentNotesApp
 421	GetCurrentRemoteUIApp
+424	GetWorldClockItemCount
+425	CreateNewWorldClock
 427	PrepareAlarmClockTime
 428	AcceptAlarmClockTime
 429	EnableAlarmClockAlarm
+439	GetRegionIndex
+440	SetRegionIndex
+441	SetCityIndex
+442	SelectWorldClock
+443	GetCityIndex
+444	UpdateWorldClock
 446	ResumeGame
 447	ExitGame
 448	EnoughSongsToPlay
@@ -8536,6 +8696,8 @@
 497	DeleteSelectedSession
 498	GetMainMenuSelectionIndex
 499	GotoLapTimerScreen
+500	StopSportTimerSession
+501	IsTimerRunning
 502	GetCurrentSportTimerApp
 503	OnSelectButton
 504	SetLockState
@@ -8546,6 +8708,7 @@
 509	GoToPrevLockDigit
 510	OniPodActivateLock
 511	OniPodSetLockCombination
+512	GetCurrentLockApp
 2554	BootDesign
 2555	BootOtherApplications
 2556	RegisterMP3ExampleKeys
@@ -9300,6 +9463,9 @@
 104	StartCommandTimer
 105	StopCommandTimer
 106	CommandTimerIsActive
+107	RegisterLocalKey
+108	RegisterGlobalKey
+109	EndKeyRegistry
 110	RegisterKeyHandler
 111	ClearKeyHandler
 112	SaveKeyHandler
@@ -9381,6 +9547,7 @@
 191	WheelValue
 192	WheelEventInterval
 202	GetSelectedCalendarDate
+204	GetMP3PlayerExampleModel
 205	Shutdown
 206	UpdateBacklightMode
 207	TickleBacklight
@@ -9405,6 +9572,8 @@
 226	ClearPodcastDescriptionTimerHandler
 227	EnableRemoteCmds
 228	DisableRemoteCmds
+229	GetMP3PlayerExampleApp
+230	LoadPresetsForNewLanguage
 231	SelectLibrary
 232	SelectMasterSongList
 233	SelectAllPlayLists
@@ -9596,8 +9765,17 @@
 426	AreNotesLoading
 427	GetCurrentNotesApp
 428	GetCurrentRemoteUIApp
+431	GetWorldClockItemCount
+432	CreateNewWorldClock
 434	PrepareAlarmClockTime
+435	AcceptAlarmClockTime
 436	EnableAlarmClockAlarm
+446	GetRegionIndex
+447	SetRegionIndex
+448	SetCityIndex
+449	SelectWorldClock
+450	GetCityIndex
+451	UpdateWorldClock
 454	ResumeGame
 455	ExitGame
 456	EnoughSongsToPlay
@@ -9662,6 +9840,7 @@
 516	ExitRadio
 517	ForceRadioLeft
 518	ToggleFavoriteState
+519	SeekToStation
 521	GetCurrentRadioApp
 522	OnStartStopResumeCommand
 523	OnLapOrClearCommand
@@ -9669,6 +9848,8 @@
 525	DeleteSelectedSession
 526	GetMainMenuSelectionIndex
 527	GotoLapTimerScreen
+528	StopSportTimerSession
+529	IsTimerRunning
 530	GetCurrentSportTimerApp
 531	OnSelectButton
 532	SetLockState
@@ -10542,6 +10723,9 @@
 104	StartCommandTimer
 105	StopCommandTimer
 106	CommandTimerIsActive
+107	RegisterLocalKey
+108	RegisterGlobalKey
+109	EndKeyRegistry
 110	RegisterKeyHandler
 111	ClearKeyHandler
 112	SaveKeyHandler
@@ -10623,6 +10807,7 @@
 191	WheelValue
 192	WheelEventInterval
 202	GetSelectedCalendarDate
+204	GetMP3PlayerExampleModel
 205	Shutdown
 206	UpdateBacklightMode
 207	TickleBacklight
@@ -10647,6 +10832,8 @@
 226	ClearPodcastDescriptionTimerHandler
 227	EnableRemoteCmds
 228	DisableRemoteCmds
+229	GetMP3PlayerExampleApp
+230	LoadPresetsForNewLanguage
 231	SelectLibrary
 232	SelectMasterSongList
 233	SelectAllPlayLists
@@ -10741,6 +10928,7 @@
 323	HasFreeSpaceOnDataVolume
 324	IsMenuKeyPressed
 326	IsSelectKeyPressed
+328	GetFirstBootState
 329	ClearFirstBootState
 330	GetKeypadLockState
 331	GetMicAttachedState
@@ -10773,6 +10961,7 @@
 360	SetContrastLevelSetting
 361	GetVolumeSetting
 362	SetVolumeSetting
+363	GetVolumeLimitSetting
 365	GetEqualizerSetting
 366	SetEqualizerSetting
 367	GetClockAlarmSetting
@@ -10849,8 +11038,18 @@
 442	AreNotesLoading
 443	GetCurrentNotesApp
 444	GetCurrentRemoteUIApp
+447	GetWorldClockItemCount
+448	CreateNewWorldClock
+449	DeleteSelectedClock
 450	PrepareAlarmClockTime
+451	AcceptAlarmClockTime
 452	EnableAlarmClockAlarm
+462	GetRegionIndex
+463	SetRegionIndex
+464	SetCityIndex
+465	SelectWorldClock
+466	GetCityIndex
+467	UpdateWorldClock
 470	ResumeGame
 471	ExitGame
 472	EnoughSongsToPlay
@@ -10917,6 +11116,7 @@
 533	ExitRadio
 534	ForceRadioLeft
 535	ToggleFavoriteState
+536	SeekToStation
 538	GetCurrentRadioApp
 539	OnStartStopResumeCommand
 540	OnLapOrClearCommand
@@ -10924,6 +11124,8 @@
 542	DeleteSelectedSession
 543	GetMainMenuSelectionIndex
 544	GotoLapTimerScreen
+545	StopSportTimerSession
+546	IsTimerRunning
 547	GetCurrentSportTimerApp
 548	OnSelectButton
 549	SetLockState
@@ -11822,6 +12024,9 @@
 97	StartCommandTimer
 98	StopCommandTimer
 99	CommandTimerIsActive
+100	RegisterLocalKey
+101	RegisterGlobalKey
+102	EndKeyRegistry
 103	RegisterKeyHandler
 104	ClearKeyHandler
 105	SaveKeyHandler
@@ -11902,6 +12107,7 @@
 183	WheelValue
 184	WheelEventInterval
 193	GetSelectedCalendarDate
+194	GetMP3PlayerExampleModel
 195	Shutdown
 196	UpdateBacklightMode
 197	HandleBacklightEvent
@@ -11916,6 +12122,7 @@
 210	HandlePowerDisconnected
 211	RegisterTickleHandler
 212	ClearTickleHandler
+213	GetMP3PlayerExampleApp
 214	LoadPresetsForNewLanguage
 215	SelectLibrary
 216	SelectMasterSongList
@@ -11927,6 +12134,8 @@
 224	SelectAlbumList
 227	QueueSong
 229	IsTemporaryPlaylistIndex
+230	IsTemporarySongItemIndex
+231	IsTemporaryListEmpty
 232	ClearTemporaryPlaylist
 233	UpdateSort
 234	UpdateArtistList
@@ -11963,9 +12172,13 @@
 265	SetSleepState
 266	TurnScreenOnOff
 270	IsMenuKeyPressed
+273	GetFirstBootState
 274	ClearFirstBootState
+275	GetKeypadLockState
+277	GetPowerConnectedState
 280	SetSetting
 281	GetSetting
+282	LoadNVRAMSettings
 285	GetContrastLevelSetting
 286	SetContrastLevelSetting
 287	GetVolumeSetting
@@ -12021,8 +12234,10 @@
 342	PrepareAlarmDisplay
 343	HandleAlarms
 344	GetCurrentCalendarApp
+346	RestoreSelectedListIndex
 347	SelectSubItem
 348	SelectSuperItem
+350	AtTopMenu
 354	UseNotesOnlyUI
 355	AreNotesLoading
 356	GetCurrentNotesApp
@@ -12593,6 +12808,9 @@
 96	StartCommandTimer
 97	StopCommandTimer
 98	CommandTimerIsActive
+99	RegisterLocalKey
+100	RegisterGlobalKey
+101	EndKeyRegistry
 102	RegisterKeyHandler
 103	ClearKeyHandler
 104	SaveKeyHandler
@@ -12705,6 +12923,8 @@
 224	SelectAlbumList
 227	QueueSong
 229	IsTemporaryPlaylistIndex
+230	IsTemporarySongItemIndex
+231	IsTemporaryListEmpty
 232	ClearTemporaryPlaylist
 233	UpdateSort
 234	UpdateArtistList
@@ -12742,7 +12962,10 @@
 266	TurnScreenOnOff
 267	PreventAutoSleep
 271	IsMenuKeyPressed
+274	GetFirstBootState
 275	ClearFirstBootState
+276	GetKeypadLockState
+278	GetPowerConnectedState
 281	SetSetting
 282	GetSetting
 283	LoadNVRAMSettings
@@ -13363,6 +13586,9 @@
 96	StartCommandTimer
 97	StopCommandTimer
 98	CommandTimerIsActive
+99	RegisterLocalKey
+100	RegisterGlobalKey
+101	EndKeyRegistry
 102	RegisterKeyHandler
 103	ClearKeyHandler
 104	SaveKeyHandler
@@ -13476,6 +13702,8 @@
 225	SelectAlbumList
 228	QueueSong
 230	IsTemporaryPlaylistIndex
+231	IsTemporarySongItemIndex
+232	IsTemporaryListEmpty
 233	ClearTemporaryPlaylist
 234	UpdateSort
 235	UpdateArtistList
@@ -13513,7 +13741,10 @@
 267	TurnScreenOnOff
 268	PreventAutoSleep
 272	IsMenuKeyPressed
+275	GetFirstBootState
 276	ClearFirstBootState
+277	GetKeypadLockState
+280	GetPowerConnectedState
 283	SetSetting
 284	GetSetting
 285	LoadNVRAMSettings
@@ -14140,6 +14371,9 @@
 100	StartCommandTimer
 101	StopCommandTimer
 102	CommandTimerIsActive
+103	RegisterLocalKey
+104	RegisterGlobalKey
+105	EndKeyRegistry
 106	RegisterKeyHandler
 107	ClearKeyHandler
 108	SaveKeyHandler
@@ -14253,6 +14487,8 @@
 229	SelectAlbumList
 232	QueueSong
 235	IsTemporaryPlaylistIndex
+236	IsTemporarySongItemIndex
+237	IsTemporaryListEmpty
 238	ClearTemporaryPlaylist
 239	UpdateSort
 240	UpdateArtistList
@@ -14270,6 +14506,7 @@
 252	EndRewind
 253	IsSongPlaying
 254	IsSongPaused
+255	ClearCurrentTrack
 256	ShowStatusBarClock
 257	GetTrackPosition
 258	SetTrackPosition
@@ -14295,9 +14532,12 @@
 278	GetDiskAcquired
 279	HasFreeSpaceOnDataVolume
 280	IsMenuKeyPressed
+283	GetFirstBootState
 284	ClearFirstBootState
+285	GetKeypadLockState
 286	CanRecordVoiceMemo
 287	UpdateMicrophoneState
+290	GetPowerConnectedState
 293	SetSetting
 294	GetSetting
 295	LoadNVRAMSettings
@@ -14369,6 +14609,7 @@
 365	CurrentNoteHasLinks
 366	AtTopMenu
 367	PopSystemHistoryIfNecessary
+369	ResetCanGoNowPlaying
 370	UseNotesOnlyUI
 371	AreNotesLoading
 372	GetCurrentNotesApp
@@ -15101,6 +15342,9 @@
 100	StartCommandTimer
 101	StopCommandTimer
 102	CommandTimerIsActive
+103	RegisterLocalKey
+104	RegisterGlobalKey
+105	EndKeyRegistry
 106	RegisterKeyHandler
 107	ClearKeyHandler
 108	SaveKeyHandler
@@ -15214,6 +15458,8 @@
 229	SelectAlbumList
 232	QueueSong
 235	IsTemporaryPlaylistIndex
+236	IsTemporarySongItemIndex
+237	IsTemporaryListEmpty
 238	ClearTemporaryPlaylist
 239	UpdateSort
 240	UpdateArtistList
@@ -15231,6 +15477,7 @@
 252	EndRewind
 253	IsSongPlaying
 254	IsSongPaused
+255	ClearCurrentTrack
 256	ShowStatusBarClock
 257	GetTrackPosition
 258	SetTrackPosition
@@ -15256,9 +15503,12 @@
 278	GetDiskAcquired
 279	HasFreeSpaceOnDataVolume
 280	IsMenuKeyPressed
+283	GetFirstBootState
 284	ClearFirstBootState
+285	GetKeypadLockState
 286	CanRecordVoiceMemo
 287	UpdateMicrophoneState
+290	GetPowerConnectedState
 293	SetSetting
 294	GetSetting
 295	LoadNVRAMSettings
@@ -15330,6 +15580,7 @@
 365	CurrentNoteHasLinks
 366	AtTopMenu
 367	PopSystemHistoryIfNecessary
+369	ResetCanGoNowPlaying
 370	UseNotesOnlyUI
 371	AreNotesLoading
 372	GetCurrentNotesApp
@@ -16064,6 +16315,9 @@
 100	StartCommandTimer
 101	StopCommandTimer
 102	CommandTimerIsActive
+103	RegisterLocalKey
+104	RegisterGlobalKey
+105	EndKeyRegistry
 106	RegisterKeyHandler
 107	ClearKeyHandler
 108	SaveKeyHandler
@@ -16206,6 +16460,7 @@
 258	EndRewind
 259	IsSongPlaying
 260	IsSongPaused
+261	ClearCurrentTrack
 262	ShowStatusBarClock
 263	GetTrackPosition
 264	SetTrackPosition
@@ -16231,9 +16486,12 @@
 284	GetDiskAcquired
 285	HasFreeSpaceOnDataVolume
 286	IsMenuKeyPressed
+289	GetFirstBootState
 290	ClearFirstBootState
+291	GetKeypadLockState
 292	CanRecordVoiceMemo
 293	UpdateMicrophoneState
+296	GetPowerConnectedState
 298	SetShuffleFilterSpokenWord
 299	ClearShuffleFilterSpokenWord
 302	SetSetting
@@ -17065,6 +17323,9 @@
 98	StartCommandTimer
 99	StopCommandTimer
 100	CommandTimerIsActive
+101	RegisterLocalKey
+102	RegisterGlobalKey
+103	EndKeyRegistry
 104	RegisterKeyHandler
 105	ClearKeyHandler
 106	SaveKeyHandler
@@ -17178,6 +17439,8 @@
 228	SelectAlbumList
 231	QueueSong
 234	IsTemporaryPlaylistIndex
+235	IsTemporarySongItemIndex
+236	IsTemporaryListEmpty
 237	ClearTemporaryPlaylist
 238	UpdateSort
 239	UpdateArtistList
@@ -17195,6 +17458,7 @@
 251	EndRewind
 252	IsSongPlaying
 253	IsSongPaused
+254	ClearCurrentTrack
 255	ShowStatusBarClock
 256	GetTrackPosition
 257	SetTrackPosition
@@ -17220,7 +17484,10 @@
 277	GetDiskAcquired
 278	HasFreeSpaceOnDataVolume
 279	IsMenuKeyPressed
+282	GetFirstBootState
 283	ClearFirstBootState
+284	GetKeypadLockState
+289	GetPowerConnectedState
 292	SetSetting
 293	GetSetting
 294	LoadNVRAMSettings
@@ -17292,6 +17559,7 @@
 364	CurrentNoteHasLinks
 365	AtTopMenu
 366	PopSystemHistoryIfNecessary
+368	ResetCanGoNowPlaying
 369	UseNotesOnlyUI
 370	AreNotesLoading
 371	GetCurrentNotesApp
@@ -18054,6 +18322,7 @@
 258	EndRewind
 259	IsSongPlaying
 260	IsSongPaused
+261	ClearCurrentTrack
 262	ShowStatusBarClock
 263	GetTrackPosition
 264	SetTrackPosition
@@ -18091,6 +18360,7 @@
 304	ChangePlaylist
 305	CanChangePlaylist
 306	ResetFFRewState
+307	StopFFRew
 310	SetSetting
 311	GetSetting
 312	LoadNVRAMSettings
@@ -20838,6 +21108,7 @@
 260	EndRewind
 261	IsSongPlaying
 262	IsSongPaused
+263	ClearCurrentTrack
 264	ShowStatusBarClock
 265	GetTrackPosition
 266	SetTrackPosition
@@ -20877,6 +21148,7 @@
 306	ChangePlaylist
 307	CanChangePlaylist
 308	ResetFFRewState
+309	StopFFRew
 312	SetSetting
 313	GetSetting
 314	LoadNVRAMSettings
@@ -22961,6 +23233,7 @@
 260	EndRewind
 261	IsSongPlaying
 262	IsSongPaused
+263	ClearCurrentTrack
 264	ShowStatusBarClock
 265	GetTrackPosition
 266	SetTrackPosition
@@ -23000,6 +23273,7 @@
 307	ChangePlaylist
 308	CanChangePlaylist
 309	ResetFFRewState
+310	StopFFRew
 313	SetSetting
 314	GetSetting
 315	LoadNVRAMSettings
@@ -24035,9 +24309,12 @@
 295	GetDiskAcquired
 296	HasFreeSpaceOnDataVolume
 297	IsMenuKeyPressed
+300	GetFirstBootState
 301	ClearFirstBootState
+302	GetKeypadLockState
 303	CanRecordVoiceMemo
 304	UpdateMicrophoneState
+307	GetPowerConnectedState
 309	SetShuffleFilterSpokenWord
 310	ClearShuffleFilterSpokenWord
 311	AdjustBookSpeed
@@ -25051,6 +25328,8 @@
 244	SetCurfewTimeout
 245	UpdateCurfewTimer
 246	TickleSleep
+247	MayForceSleep
+248	ShowDiskActivityMeter
 249	HandlePowerConnected
 250	HandlePowerDisconnected
 251	RegisterTickleHandler
@@ -25135,6 +25414,10 @@
 330	ChangeCurrentSongRating
 331	GetTrackRatingChanged
 332	WheelFeedbackSound
+333	FilterWheelMovement
+334	ResetPreferences
+335	GetBrightnessLimit
+336	GetBacklightTimeout
 337	SetBacklightTimeout
 338	SetContrastLevel
 339	SetVolume
@@ -25150,6 +25433,9 @@
 349	CheckVolumeLimitSettingsChanged
 350	OnEnableVolumeLimit
 351	OnDisableVolumeLimit
+353	IsVolumeLimitEnabled
+355	SetBrightness
+356	GetBrightness
 357	GetQueueingState
 358	GetSleepState
 359	SetSleepState
@@ -25320,6 +25606,7 @@
 546	GetTimerSettingIndex
 547	GetTransitionSetting
 548	GetTVOutSetting
+555	SetDisplayMode
 557	GetSlideShowApp
 558	FirstScreen
 559	LastScreen
@@ -25329,6 +25616,7 @@
 563	HandlePlayPause
 564	SelectAlbum
 565	CleanupView
+569	GetFirstItemOffset
 570	EnterApplication
 571	ExitApplication
 572	IdleCache
@@ -25391,6 +25679,7 @@
 730	PrepareAlarmClockTime
 731	AcceptAlarmClockTime
 732	EnableAlarmClockAlarm
+733	HandleAlarmClockAlarm
 742	SetRegionIndex
 743	SetCityIndex
 744	SelectWorldClock
@@ -26497,6 +26786,7 @@
 190	WheelValue
 191	WheelEventInterval
 200	GetSelectedCalendarDate
+202	GetMP3PlayerExampleModel
 203	Shutdown
 204	UpdateBacklightMode
 205	TickleBacklight
@@ -26519,6 +26809,7 @@
 222	ClearTickleHandler
 223	EnableRemoteCmds
 224	DisableRemoteCmds
+225	GetMP3PlayerExampleApp
 226	LoadPresetsForNewLanguage
 227	SelectLibrary
 228	SelectMasterSongList
@@ -26562,6 +26853,7 @@
 266	EndRewind
 267	IsSongPlaying
 268	IsSongPaused
+270	ClearCurrentTrack
 271	ShowStatusBarClock
 272	GetTrackPosition
 273	SetTrackPosition
@@ -26589,9 +26881,12 @@
 295	GetDiskAcquired
 296	HasFreeSpaceOnDataVolume
 297	IsMenuKeyPressed
+300	GetFirstBootState
 301	ClearFirstBootState
+302	GetKeypadLockState
 303	CanRecordVoiceMemo
 304	UpdateMicrophoneState
+307	GetPowerConnectedState
 309	SetShuffleFilterSpokenWord
 310	ClearShuffleFilterSpokenWord
 311	AdjustBookSpeed
@@ -26613,6 +26908,8 @@
 329	SetVolumeSetting
 331	SetEqualizerSetting
 332	GetEqualizerSetting
+333	SetClockAlarmSetting
+336	GetGroupCompilationsSetting
 337	GetTimeZoneSetting
 338	SetTimeZoneSetting
 339	PrepareDateTimeSetting
@@ -26732,6 +27029,8 @@
 481	GetTimerSettingIndex
 482	GetTransitionSetting
 483	GetTVOutSetting
+484	SetDisplayMode
+485	GetSlideShowApp
 486	FirstScreen
 487	LastScreen
 488	NextScreen
@@ -26740,6 +27039,7 @@
 491	HandlePlayPause
 492	SelectAlbum
 493	CleanupView
+497	GetFirstItemOffset
 498	EnterApplication
 499	ExitApplication
 500	IdleCache
@@ -27618,6 +27918,7 @@
 191	WheelValue
 192	WheelEventInterval
 201	GetSelectedCalendarDate
+203	GetMP3PlayerExampleModel
 204	Shutdown
 205	UpdateBacklightMode
 206	TickleBacklight
@@ -27642,6 +27943,7 @@
 225	UnregisterPodcastDescriptionTimerHandler
 226	EnableRemoteCmds
 227	DisableRemoteCmds
+228	GetMP3PlayerExampleApp
 229	LoadPresetsForNewLanguage
 230	SelectLibrary
 231	SelectMasterSongList
@@ -27718,9 +28020,12 @@
 302	GetDiskAcquired
 303	HasFreeSpaceOnDataVolume
 304	IsMenuKeyPressed
+307	GetFirstBootState
 308	ClearFirstBootState
+309	GetKeypadLockState
 310	CanRecordVoiceMemo
 311	UpdateMicrophoneState
+314	GetPowerConnectedState
 316	SetShuffleFilterSpokenWord
 317	ClearShuffleFilterSpokenWord
 318	AdjustBookSpeed
@@ -27879,6 +28184,7 @@
 500	HandlePlayPause
 501	SelectAlbum
 502	CleanupView
+506	GetFirstItemOffset
 507	EnterApplication
 508	ExitApplication
 509	IdleCache
@@ -28777,6 +29083,7 @@
 189	WheelValue
 190	WheelEventInterval
 199	GetSelectedCalendarDate
+201	GetMP3PlayerExampleModel
 202	Shutdown
 203	UpdateBacklightMode
 204	TickleBacklight
@@ -28799,6 +29106,7 @@
 221	ClearTickleHandler
 222	EnableRemoteCmds
 223	DisableRemoteCmds
+224	GetMP3PlayerExampleApp
 225	LoadPresetsForNewLanguage
 226	SelectLibrary
 227	SelectMasterSongList
@@ -28839,6 +29147,7 @@
 263	EndRewind
 264	IsSongPlaying
 265	IsSongPaused
+267	ClearCurrentTrack
 268	ShowStatusBarClock
 269	GetTrackPosition
 270	SetTrackPosition
@@ -28866,15 +29175,20 @@
 292	GetDiskAcquired
 293	HasFreeSpaceOnDataVolume
 294	IsMenuKeyPressed
+297	GetFirstBootState
 298	ClearFirstBootState
+299	GetKeypadLockState
 300	CanRecordVoiceMemo
 301	UpdateMicrophoneState
+304	GetPowerConnectedState
 306	SetShuffleFilterSpokenWord
 307	ClearShuffleFilterSpokenWord
 308	AdjustBookSpeed
 310	ChangePlaylist
 311	CanChangePlaylist
 312	ResetFFRewState
+313	StopFFRew
+314	SetFlashBacklight
 317	SetSetting
 318	GetSetting
 319	LoadNVRAMSettings
@@ -28995,6 +29309,7 @@
 457	EnoughSongsToPlay
 458	GetMusicQuizApp
 459	StartAppSlideShow
+460	StopAppSlideShow
 461	NextSlide
 462	PreviousSlide
 463	NextEffect
@@ -29007,7 +29322,9 @@
 470	GetMusicSetting
 471	GetTimerSettingIndex
 472	GetTVOutSetting
+473	SetDisplayMode
 478	GetCurrentIndex
+480	SelectAlbum
 483	CleanupView
 484	EnterApplication
 485	ExitApplication
@@ -29856,6 +30173,7 @@
 191	WheelValue
 192	WheelEventInterval
 201	GetSelectedCalendarDate
+203	GetMP3PlayerExampleModel
 204	Shutdown
 205	UpdateBacklightMode
 206	TickleBacklight
@@ -29880,6 +30198,7 @@
 225	UnregisterPodcastDescriptionTimerHandler
 226	EnableRemoteCmds
 227	DisableRemoteCmds
+228	GetMP3PlayerExampleApp
 229	LoadPresetsForNewLanguage
 230	SelectLibrary
 231	SelectMasterSongList
@@ -29956,9 +30275,12 @@
 302	GetDiskAcquired
 303	HasFreeSpaceOnDataVolume
 304	IsMenuKeyPressed
+307	GetFirstBootState
 308	ClearFirstBootState
+309	GetKeypadLockState
 310	CanRecordVoiceMemo
 311	UpdateMicrophoneState
+314	GetPowerConnectedState
 316	SetShuffleFilterSpokenWord
 317	ClearShuffleFilterSpokenWord
 318	AdjustBookSpeed
@@ -30117,6 +30439,7 @@
 500	HandlePlayPause
 501	SelectAlbum
 502	CleanupView
+506	GetFirstItemOffset
 507	EnterApplication
 508	ExitApplication
 509	IdleCache
@@ -31081,6 +31404,7 @@
 258	EndRewind
 259	IsSongPlaying
 260	IsSongPaused
+261	ClearCurrentTrack
 262	ShowStatusBarClock
 263	GetTrackPosition
 264	SetTrackPosition
@@ -31118,6 +31442,7 @@
 304	ChangePlaylist
 305	CanChangePlaylist
 306	ResetFFRewState
+307	StopFFRew
 310	SetSetting
 311	GetSetting
 312	LoadNVRAMSettings

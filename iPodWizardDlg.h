@@ -59,6 +59,8 @@ protected:
 
 	// Generated message map functions
 	virtual BOOL OnInitDialog();
+	virtual BOOL PreTranslateMessage(MSG *pMsg);
+	CToolTipCtrl m_FwTip;                               // "YY/MM/DD" over the dates in the Bootloader column of the firmware list
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnPaint();
 	afx_msg int OnCreate(LPCREATESTRUCT lpCreateStruct);
@@ -85,7 +87,8 @@ public:
 	afx_msg void OnBnClickedOpen();
 	void OpenUpdater(BOOL firstTime);
 	CComboBox m_EditModeCombo;
-	CComboBox m_FirmwareCombo;
+	CStringArray m_FirmwareLabels;               // what the Select window lists for an updater file (it was a hidden drop-down list that nobody could see)
+	int m_FirmwareSel;                           // the one that is chosen
 	CComboBox m_iPodDriveCombo;
 	CStringArray m_FirmwareNames; //non visible
 	afx_msg void OnBnClickedLoadFirmware();
@@ -114,6 +117,7 @@ public:
 	afx_msg void OnBnClickedTweaks();
 	void GetAppPath(CString &app_path);
 	int CheckiPod(BOOL bSilent=FALSE);
+	void FitFirmwareColumns();                             // the columns of the firmware information fill the list, none of their headers is cut off
 	void UpdateIpodDrive();                                // theApp.m_iPodDRV: iPod_Control\Device of the iPod selected in the detector
 	afx_msg void OnCbnSelChangeiPodDriveCombo();
 	afx_msg void OnBnClickedLoadipodfwButton();
@@ -122,6 +126,10 @@ public:
 	afx_msg LRESULT OnDeviceChange(WPARAM wParam, LPARAM lParam);
 public:
 	afx_msg void OnBnClickedEjectButton();
+	void EjectIPod(BOOL bQuiet);
+	void ShowWriteSuccess();
+	int m_BootCheck;                                           // what the last VerifyBootloader found: 1 = read back and the same, 2 = nothing to check, 3 = no reflash so not checked, 0 = not verified
+	int VerifyBootloader(LPCTSTR devstring, const BYTE *written, DWORD size, BOOL reflash);   // after a write: the header + table and the bootloader image read back and compared; 1 = same, 0 = different (message shown), -1 = not read
 public:
 	afx_msg void OnBnClickedOpenFfile();
 public:

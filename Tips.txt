@@ -39,3 +39,11 @@
 2: Have a question?
 3: Info
 4: https://discord.com/invite/Hd9fhjzFCU
+
+1: When a write reflashes the iPod, iPodWizard reads the header, the table of images and the bootloader back from the iPod and compares them with what was written. If that check fails, the iPod is not ejected. Use the 'Help' button in the warning to see how to recover before you eject it.
+2: Is the bootloader safe?
+3: Troubleshooting
+
+1: Go to Tweaks > Clicker Tone to change the pitch of the wheel's clicker!
+2: Want a different click?
+3: Tweaks

@@ -305,6 +305,7 @@ void CEditorDialog::SetFirmware(CFirmware *pFirmware)
 	m_StringDialog.SetFirmware(pFirmware);
 	m_LayoutDialog.SetFirmware(pFirmware);
 	m_TweaksDialog.SetFirmware(pFirmware);
+	m_TweaksDialog.SetLayoutDialog(&m_LayoutDialog);
 	m_TweaksDialog.Refresh();
 	m_pFirmware=pFirmware;
 	if (pFirmware->GetNumOTFFonts()==0) //if no OTF fonts then show only bitmap (even if before user was on OTF)
